@@ -38,6 +38,7 @@ typedef struct {
     char ap_ip[16];                         ///< 配网IP地址
     wifi_event_cb_t wifi_event_cb;          ///< wifi管理事件回调
     int save_wifi_count;                    ///< wifi保存数量（超过20时，建议增加状态机栈空间）
+    int web_port;                           ///< Web 配网端口，默认80
 } wifi_manage_config_t;
  
 #define WIFI_MANAGE_DEFAULT_CONFIG()                         \
@@ -49,6 +50,7 @@ typedef struct {
         .ap_ip                 = "192.168.4.1",            \
         .wifi_event_cb         = NULL,                       \
         .save_wifi_count       = 5,                          \
+        .web_port              = 80,                         \
     }
 
 /**

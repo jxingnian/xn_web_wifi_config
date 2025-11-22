@@ -298,6 +298,16 @@ esp_err_t xn_wifi_module_init(const wifi_module_config_t *config)
         s_ap_netif = esp_netif_create_default_wifi_ap();
     }
 
+    /* 如启用 AP，并且配置了 ap_ip，则设置 AP 接口 IP 地址 */
+    if (s_wifi_cfg.enable_ap && s_ap_netif != NULL && s_wifi_cfg.ap_ip[0] != '\0') {
+        esp_netif_ip_info_t ip_info = {0};
+        if (esp_netif_str_to_ip4(s_wifi_cfg.ap_ip, &ip_info.ip) == ESP_OK) {
+            /* 保持默认网关和掩码不变，仅修改 IP 即可，简单起见也可以同步设置网关=IP */
+            ip_info.gw = ip_info.ip;
+            esp_netif_set_ip_info(s_ap_netif, &ip_info);
+        }
+    }
+
     /* 5. 初始化 WiFi 驱动（若已初始化，则可能返回 ESP_ERR_WIFI_INIT_STATE，可忽略） */
     wifi_init_config_t wifi_init_cfg = WIFI_INIT_CONFIG_DEFAULT();
     ret = esp_wifi_init(&wifi_init_cfg);

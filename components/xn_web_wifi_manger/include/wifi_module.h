@@ -48,6 +48,7 @@ typedef struct {
     bool enable_ap;                         ///< 是否启用 AP 模式（用于配网等场景）
     char ap_ssid[32];                       ///< AP 模式下的热点名称
     char ap_password[64];                   ///< AP 模式下的热点密码
+    char ap_ip[16];                         ///< AP 模式下的 IP 地址字符串，例如 "192.168.4.1"
     uint8_t ap_channel;                     ///< AP 信道
     uint8_t max_sta_conn;                   ///< AP 模式下的最大连接数
     wifi_module_event_cb_t event_cb;        ///< WiFi 模块事件回调
@@ -69,6 +70,7 @@ typedef struct {
         .enable_ap    = true,                                   \
         .ap_ssid      = "XingNian",                           \
         .ap_password  = "12345678",                           \
+        .ap_ip        = "192.168.4.1",                        \
         .ap_channel   = 1,                                      \
         .max_sta_conn = 4,                                      \
         .event_cb     = NULL,                                   \

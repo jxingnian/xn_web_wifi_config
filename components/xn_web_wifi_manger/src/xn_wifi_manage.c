@@ -2,7 +2,7 @@
  * @Author: 星年 && jixingnian@gmail.com
  * @Date: 2025-11-22 16:24:42
  * @LastEditors: xingnian jixingnian@gmail.com
- * @LastEditTime: 2025-11-22 19:00:56
+ * @LastEditTime: 2025-11-22 19:24:41
  * @FilePath: \xn_web_wifi_config\components\xn_web_wifi_manger\src\xn_wifi_manage.c
  * @Description: WiFi 管理模块实现。
  */
@@ -17,6 +17,7 @@
 
 #include "wifi_module.h"
 #include "storage_module.h"
+#include "web_module.h"
 #include "xn_wifi_manage.h"
 
 /* 日志 TAG，用于 ESP_LOGx 系列接口（如果后续需要打印日志，可直接使用此 TAG） */
@@ -218,6 +219,10 @@ esp_err_t xn_wifi_manage_init(const wifi_manage_config_t *config)
     strncpy(wifi_cfg.ap_password, s_wifi_cfg.ap_password, sizeof(wifi_cfg.ap_password));
     wifi_cfg.ap_password[sizeof(wifi_cfg.ap_password) - 1] = '\0';
 
+    // 拷贝配网 AP 的 IP 地址到 WiFi 模块配置，便于在 AP 接口上设置固定 IP
+    strncpy(wifi_cfg.ap_ip, s_wifi_cfg.ap_ip, sizeof(wifi_cfg.ap_ip));
+    wifi_cfg.ap_ip[sizeof(wifi_cfg.ap_ip) - 1] = '\0';
+
     // 将 WiFi 模块事件回调指向当前管理模块，用于在获取到 IP/断开等事件时更新状态机
     wifi_cfg.event_cb = wifi_manage_on_wifi_event;
 
@@ -243,6 +248,16 @@ esp_err_t xn_wifi_manage_init(const wifi_manage_config_t *config)
     }
 
     // 初始化WEB配网模块
+    web_module_config_t web_cfg = WEB_MODULE_DEFAULT_CONFIG();
+    // 使用管理配置中的 web_port 作为 HTTP 端口，非法值时退回 80
+    if (s_wifi_cfg.web_port > 0 && s_wifi_cfg.web_port <= 65535) {
+        web_cfg.http_port = (uint16_t)s_wifi_cfg.web_port;
+    }
+
+    ret = xn_web_module_start(&web_cfg);
+    if (ret != ESP_OK) {
+        return ret;
+    }
 
     // 创建WiFi管理任务
     if (s_wifi_manage_task == NULL) {
