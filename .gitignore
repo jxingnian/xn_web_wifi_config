@@ -1,0 +1,7 @@
+# ESP-IDF 构建文件
+build/
+managed_components/
+
+# ESP-IDF 配置文件
+sdkconfig
+sdkconfig.old
