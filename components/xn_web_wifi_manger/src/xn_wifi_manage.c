@@ -2,7 +2,7 @@
  * @Author: 星年 && jixingnian@gmail.com
  * @Date: 2025-11-22 16:24:42
  * @LastEditors: xingnian jixingnian@gmail.com
- * @LastEditTime: 2025-11-22 22:05:45
+ * @LastEditTime: 2025-11-22 22:47:30
  * @FilePath: \xn_web_wifi_config\components\xn_web_wifi_manger\src\xn_wifi_manage.c
  * @Description: WiFi 管理模块实现（封装 WiFi / 存储 / Web 配网，提供自动重连与状态管理）
  */
@@ -138,6 +138,82 @@ static esp_err_t wifi_manage_get_web_status(web_wifi_status_t *out)
     return ESP_OK;
 }
 
+/* -------------------- Web 回调：已保存 WiFi 列表与删除 -------------------- */
+/**
+ * @brief 提供给 Web 的“已保存 WiFi 列表”回调
+ */
+static esp_err_t wifi_manage_get_web_saved_list(web_saved_wifi_info_t *list, size_t *inout_cnt)
+{
+    if (inout_cnt == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    /* 读取配置允许的最大保存数量，该值也限制存储层条目上限 */
+    uint8_t max_num = (s_wifi_cfg.save_wifi_count <= 0)
+                          ? 1
+                          : (uint8_t)s_wifi_cfg.save_wifi_count;
+
+    if (max_num == 0) {
+        *inout_cnt = 0;
+        return ESP_OK;
+    }
+
+    /* 为避免在栈上分配大数组，这里通过堆申请临时缓冲区 */
+    wifi_config_t *configs = (wifi_config_t *)malloc(max_num * sizeof(wifi_config_t));
+    if (configs == NULL) {
+        *inout_cnt = 0;
+        return ESP_ERR_NO_MEM;
+    }
+
+    uint8_t   count = 0;
+    esp_err_t ret   = wifi_storage_load_all(configs, &count);
+    if (ret != ESP_OK) {
+        free(configs);
+        *inout_cnt = 0;
+        return ret;
+    }
+
+    if (count > max_num) {
+        count = max_num;
+    }
+
+    if (list == NULL) {
+        /* 仅查询数量，不返回具体内容 */
+        *inout_cnt = count;
+        free(configs);
+        return ESP_OK;
+    }
+
+    /* 实际可写入的条目数取决于调用方提供的容量与已有数量 */
+    size_t cap = *inout_cnt;
+    if (cap == 0) {
+        free(configs);
+        *inout_cnt = 0;
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (cap > count) {
+        cap = count;
+    }
+
+    for (size_t i = 0; i < cap; i++) {
+        strncpy(list[i].ssid, (const char *)configs[i].sta.ssid, sizeof(list[i].ssid));
+        list[i].ssid[sizeof(list[i].ssid) - 1] = '\0';
+    }
+
+    free(configs);
+
+    *inout_cnt = cap;
+    return ESP_OK;
+}
+
+/**
+ * @brief 提供给 Web 的“删除已保存 WiFi”回调
+ */
+static esp_err_t wifi_manage_delete_web_saved(const char *ssid)
+{
+    return wifi_storage_delete_by_ssid(ssid);
+}
+
 /* -------------------- WiFi 模块事件回调 -------------------- */
 /**
  * @brief 供 WiFi 模块调用的事件回调，用于驱动管理状态机
@@ -205,11 +281,18 @@ static void wifi_manage_step(void)
                               ? 1
                               : (uint8_t)s_wifi_cfg.save_wifi_count;
 
-        wifi_config_t list[max_num];
-        uint8_t       count = 0;
+        /* 为避免在任务栈上分配大数组，这里通过堆申请临时缓冲区 */
+        wifi_config_t *list = (wifi_config_t *)malloc(max_num * sizeof(wifi_config_t));
+        if (list == NULL) {
+            /* 内存不足时保留在断开状态，等待下次循环再尝试 */
+            break;
+        }
+
+        uint8_t count = 0;
 
         if (wifi_storage_load_all(list, &count) != ESP_OK || count == 0) {
             /* 没有可用配置，交由上层决定是否启用纯 AP 配网等逻辑 */
+            free(list);
             break;
         }
 
@@ -219,6 +302,7 @@ static void wifi_manage_step(void)
             s_connect_failed_ts = xTaskGetTickCount();
             s_wifi_try_index    = 0;
             s_wifi_connecting   = false;
+            free(list);
             break;
         }
 
@@ -226,6 +310,7 @@ static void wifi_manage_step(void)
         if (cfg->sta.ssid[0] == '\0') {
             /* 跳过无效 SSID */
             s_wifi_try_index++;
+            free(list);
             break;
         }
 
@@ -240,6 +325,8 @@ static void wifi_manage_step(void)
         } else {
             s_wifi_try_index++;
         }
+
+        free(list);
         break;
     }
 
@@ -365,8 +452,10 @@ esp_err_t wifi_manage_init(const wifi_manage_config_t *config)
             web_cfg.http_port = s_wifi_cfg.web_port;
         }
 
-        /* 通过回调向 Web 模块暴露当前 WiFi 状态查询能力 */
-        web_cfg.get_status_cb = wifi_manage_get_web_status;
+        /* 通过回调向 Web 模块暴露当前 WiFi 状态与已保存列表等能力 */
+        web_cfg.get_status_cb     = wifi_manage_get_web_status;
+        web_cfg.get_saved_list_cb = wifi_manage_get_web_saved_list;
+        web_cfg.delete_saved_cb   = wifi_manage_delete_web_saved;
 
         ret = web_module_init(&web_cfg);
         if (ret != ESP_OK) {

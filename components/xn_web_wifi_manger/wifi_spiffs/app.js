@@ -187,6 +187,96 @@
     }
   }
 
+  /* -------------------- 已保存 WiFi：渲染与操作 -------------------- */
+
+  /**
+   * 将已保存 WiFi 列表渲染到表格中。
+   *
+   * @param items 形如 [{ index, ssid }, ...] 的数组
+   */
+  function renderSavedList(items) {
+    if (!dom.savedBody) {
+      return;
+    }
+
+    items = Array.isArray(items) ? items : [];
+
+    dom.savedBody.innerHTML = '';
+
+    if (dom.savedEmpty) {
+      dom.savedEmpty.style.display = items.length === 0 ? 'block' : 'none';
+    }
+
+    if (items.length === 0) {
+      return;
+    }
+
+    var rows = [];
+    for (var i = 0; i < items.length; i++) {
+      var item = items[i] || {};
+      var ssid = item.ssid || '-';
+
+      rows.push(
+        '<tr>' +
+          '<td>' + (i + 1) + '</td>' +
+          '<td>' + ssid + '</td>' +
+          '<td><button type="button" class="btn" data-action="delete-saved" data-ssid="' + ssid + '">删除</button></td>' +
+        '</tr>'
+      );
+    }
+
+    dom.savedBody.innerHTML = rows.join('');
+  }
+
+  /**
+   * 从后端加载一次已保存 WiFi 列表。
+   */
+  function loadSavedList() {
+    if (!dom.savedBody || !window.fetch) {
+      return;
+    }
+
+    fetch('/api/wifi/saved')
+      .then(function (res) {
+        if (!res.ok) {
+          throw new Error('http ' + res.status);
+        }
+        return res.json();
+      })
+      .then(function (data) {
+        var items = (data && data.items) || [];
+        renderSavedList(items);
+      })
+      .catch(function () {
+        // 失败时保持占位提示，不弹出错误
+      });
+  }
+
+  /**
+   * 删除一条已保存 WiFi，按 SSID 标识。
+   */
+  function deleteSavedWifi(ssid) {
+    if (!ssid || !window.fetch) {
+      return;
+    }
+
+    fetch('/api/wifi/saved/delete?ssid=' + encodeURIComponent(ssid), {
+      method: 'POST',
+    })
+      .then(function (res) {
+        if (!res.ok) {
+          throw new Error('http ' + res.status);
+        }
+      })
+      .then(function () {
+        // 删除成功后重新加载列表
+        loadSavedList();
+      })
+      .catch(function () {
+        // 删除失败时暂不提示，保持列表不变
+      });
+  }
+
   /**
    * 从后端查询一次当前 WiFi 状态。
    *
@@ -286,6 +376,24 @@
         setConnectMessage('已提交占位请求：连接逻辑尚未接入后台');
       });
     }
+
+    // 已保存 WiFi 列表中的删除按钮（事件委托）
+    if (dom.savedBody) {
+      dom.savedBody.addEventListener('click', function (event) {
+        var target = event.target;
+        if (!target) {
+          return;
+        }
+
+        var action = target.getAttribute('data-action');
+        if (action === 'delete-saved') {
+          var ssid = target.getAttribute('data-ssid') || '';
+          if (ssid) {
+            deleteSavedWifi(ssid);
+          }
+        }
+      });
+    }
   }
 
   /* -------------------- 启动入口 -------------------- */
@@ -301,6 +409,7 @@
     renderInitialState();
     bindEvents();
     startStatusPolling();
+    loadSavedList();
   }
 
   document.addEventListener('DOMContentLoaded', bootstrap);

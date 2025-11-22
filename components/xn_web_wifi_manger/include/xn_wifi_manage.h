@@ -2,7 +2,7 @@
  * @Author: 星年 && jixingnian@gmail.com
  * @Date: 2025-11-22 16:24:42
  * @LastEditors: xingnian jixingnian@gmail.com
- * @LastEditTime: 2025-11-22 20:53:44
+ * @LastEditTime: 2025-11-22 22:36:38
  * @FilePath: \xn_web_wifi_config\components\xn_web_wifi_manger\include\xn_wifi_manage.h
  * @Description: WiFi 管理模块对外接口（封装 WiFi / 存储 / Web 配网）
  *
@@ -60,7 +60,7 @@ typedef struct {
     char ap_password[64];          ///< 配网 AP 密码（8~63 字符，留 1 字节给 '\0'）
     char ap_ip[16];                ///< 配网 AP 网口 IP 地址，如 "192.168.4.1"
     wifi_event_cb_t wifi_event_cb; ///< 状态变化回调，可为 NULL 表示不关心
-    int  save_wifi_count;          ///< 最多保存的 WiFi 条数（<=0 使用 1；>20 建议增大任务栈）
+    int  save_wifi_count;          ///< 最多保存的 WiFi 条数（<=0 使用 1；值越大占用更多 NVS/堆内存）
     int  web_port;                 ///< Web 配网页面 HTTP 监听端口（典型为 80/8080）
 } wifi_manage_config_t;
 

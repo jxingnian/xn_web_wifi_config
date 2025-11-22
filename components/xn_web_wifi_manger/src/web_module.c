@@ -15,6 +15,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "esp_log.h"
 #include "esp_spiffs.h"
@@ -185,6 +186,127 @@ static esp_err_t web_module_status_get_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+/**
+ * @brief /api/wifi/saved：获取已保存 WiFi 列表
+ */
+static esp_err_t web_module_saved_get_handler(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-cache");
+
+    /* 未提供回调时返回空列表，方便前端统一处理 */
+    if (s_web_cfg.get_saved_list_cb == NULL) {
+        static const char *EMPTY_JSON = "{\"items\":[]}";
+        httpd_resp_send(req, EMPTY_JSON, strlen(EMPTY_JSON));
+        return ESP_OK;
+    }
+
+    /* 第一次调用仅查询需要的条目数量，避免多余的堆分配 */
+    size_t    cnt = 0;
+    esp_err_t ret = s_web_cfg.get_saved_list_cb(NULL, &cnt);
+    if (ret != ESP_OK) {
+        httpd_resp_send_err(req,
+                            HTTPD_500_INTERNAL_SERVER_ERROR,
+                            "load saved wifi failed");
+        return ESP_OK;
+    }
+
+    if (cnt == 0) {
+        static const char *EMPTY_JSON = "{\"items\":[]}";
+        httpd_resp_send(req, EMPTY_JSON, strlen(EMPTY_JSON));
+        return ESP_OK;
+    }
+
+    web_saved_wifi_info_t *list = (web_saved_wifi_info_t *)malloc(cnt * sizeof(web_saved_wifi_info_t));
+    if (list == NULL) {
+        httpd_resp_send_err(req,
+                            HTTPD_500_INTERNAL_SERVER_ERROR,
+                            "no memory");
+        return ESP_OK;
+    }
+
+    size_t cap = cnt;
+    ret        = s_web_cfg.get_saved_list_cb(list, &cap);
+    if (ret != ESP_OK) {
+        free(list);
+        httpd_resp_send_err(req,
+                            HTTPD_500_INTERNAL_SERVER_ERROR,
+                            "load saved wifi failed");
+        return ESP_OK;
+    }
+
+    if (cap > cnt) {
+        cap = cnt;
+    }
+
+    /* 序列化为形如 {"items":[{"index":0,"ssid":"xxx"}, ...]} 的 JSON */
+    char  json[512];
+    size_t offset = 0;
+
+    offset += (size_t)snprintf(json + offset, sizeof(json) - offset, "{\"items\":[");
+
+    for (size_t i = 0; i < cap && offset < sizeof(json); i++) {
+        const char *comma = (i == 0) ? "" : ",";
+        offset += (size_t)snprintf(json + offset,
+                                   sizeof(json) - offset,
+                                   "%s{\"index\":%u,\"ssid\":\"%s\"}",
+                                   comma,
+                                   (unsigned)i,
+                                   list[i].ssid);
+    }
+
+    free(list);
+
+    if (offset >= sizeof(json)) {
+        /* 理论上不会超出，若超出则截断为一个空列表作为兜底 */
+        const char *FALLBACK = "{\"items\":[]}";
+        httpd_resp_send(req, FALLBACK, strlen(FALLBACK));
+        return ESP_OK;
+    }
+
+    offset += (size_t)snprintf(json + offset, sizeof(json) - offset, "]}");
+
+    httpd_resp_send(req, json, (int)offset);
+    return ESP_OK;
+}
+
+/**
+ * @brief /api/wifi/saved/delete：按 SSID 删除一条已保存 WiFi
+ */
+static esp_err_t web_module_saved_delete_handler(httpd_req_t *req)
+{
+    if (s_web_cfg.delete_saved_cb == NULL) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "delete not supported");
+        return ESP_OK;
+    }
+
+    /* 解析 URL 查询字符串中的 ssid 参数 */
+    char  query[64] = {0};
+    char  ssid[32]  = {0};
+
+    if (httpd_req_get_url_query_str(req, query, sizeof(query)) != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "missing query");
+        return ESP_OK;
+    }
+
+    if (httpd_query_key_value(query, "ssid", ssid, sizeof(ssid)) != ESP_OK || ssid[0] == '\0') {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "missing ssid");
+        return ESP_OK;
+    }
+
+    esp_err_t ret = s_web_cfg.delete_saved_cb(ssid);
+    if (ret != ESP_OK) {
+        httpd_resp_send_err(req,
+                            HTTPD_500_INTERNAL_SERVER_ERROR,
+                            "delete failed");
+        return ESP_OK;
+    }
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_send(req, "{\"ok\":true}", strlen("{\"ok\":true}"));
+    return ESP_OK;
+}
+
 /* -------------------- HTTP 服务器启动 -------------------- */
 
 /**
@@ -255,6 +377,28 @@ static esp_err_t web_module_start_server(void)
             .user_ctx = NULL,
         };
         httpd_register_uri_handler(s_http_server, &uri_status);
+    }
+
+    /* 已保存 WiFi 列表接口（可选） */
+    if (s_web_cfg.get_saved_list_cb != NULL) {
+        static const httpd_uri_t uri_saved = {
+            .uri      = "/api/wifi/saved",
+            .method   = HTTP_GET,
+            .handler  = web_module_saved_get_handler,
+            .user_ctx = NULL,
+        };
+        httpd_register_uri_handler(s_http_server, &uri_saved);
+    }
+
+    /* 删除已保存 WiFi 接口（可选） */
+    if (s_web_cfg.delete_saved_cb != NULL) {
+        static const httpd_uri_t uri_saved_del = {
+            .uri      = "/api/wifi/saved/delete",
+            .method   = HTTP_POST,
+            .handler  = web_module_saved_delete_handler,
+            .user_ctx = NULL,
+        };
+        httpd_register_uri_handler(s_http_server, &uri_saved_del);
     }
 
     return ESP_OK;

@@ -17,6 +17,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <stddef.h>
 
 #include "esp_err.h"
 
@@ -35,11 +36,18 @@ typedef enum {
 typedef struct {
     web_wifi_status_state_t state; ///< 抽象连接状态，便于前端区分展示
     bool                    connected;        ///< 是否已成功连接路由器
-    char                    ssid[32];         ///< 当前连接的 SSID（无连接时可为 "-"）
+    char                    ssid[32];         ///< 当前连接的 SSID（无连接时可为 "-")
     char                    ip[16];           ///< 当前 STA 的 IPv4 地址字符串，如 "192.168.4.2"
     int8_t                  rssi;             ///< 当前连接的信号强度（dBm），无连接时可为 0
     char                    mode[8];          ///< 当前工作模式字符串，如 "AP" / "STA" / "AP+STA"
 } web_wifi_status_t;
+
+/**
+ * @brief Web 端展示用的“已保存 WiFi”精简信息
+ */
+typedef struct {
+    char ssid[32]; ///< WiFi 名称（仅保留 SSID，忽略密码等敏感信息）
+} web_saved_wifi_info_t;
 
 /**
  * @brief Web 模块查询 WiFi 状态的回调
@@ -55,13 +63,28 @@ typedef struct {
 typedef esp_err_t (*web_get_status_cb_t)(web_wifi_status_t *out_status);
 
 /**
+ * @brief 获取已保存 WiFi 列表的回调
+ *
+ * @param[in,out] list      Web 模块提供的缓存数组
+ * @param[in,out] inout_cnt 入口为缓存容量，出口为实际填充数量
+ */
+typedef esp_err_t (*web_get_saved_list_cb_t)(web_saved_wifi_info_t *list, size_t *inout_cnt);
+
+/**
+ * @brief 删除已保存 WiFi 的回调（按 SSID 匹配）
+ */
+typedef esp_err_t (*web_delete_saved_cb_t)(const char *ssid);
+
+/**
  * @brief Web 模块配置
  *
  * 该配置在初始化时传入一次，模块内部会保存副本。
  */
 typedef struct {
-    int                 http_port;      ///< HTTP 监听端口（典型为 80/8080，<=0 时使用默认 80）
-    web_get_status_cb_t get_status_cb;  ///< 查询 WiFi 状态回调，可为 NULL 表示暂不提供状态接口
+    int                   http_port;        ///< HTTP 监听端口（典型为 80/8080，<=0 时使用默认 80）
+    web_get_status_cb_t   get_status_cb;    ///< 查询当前 WiFi 状态回调
+    web_get_saved_list_cb_t get_saved_list_cb; ///< 获取已保存 WiFi 列表回调
+    web_delete_saved_cb_t delete_saved_cb;  ///< 删除已保存 WiFi 的回调
 } web_module_config_t;
 
 /**
@@ -69,8 +92,10 @@ typedef struct {
  */
 #define WEB_MODULE_DEFAULT_CONFIG()            \
     (web_module_config_t){                     \
-        .http_port     = 80,                   \
-        .get_status_cb = NULL,                 \
+        .http_port        = 80,                \
+        .get_status_cb    = NULL,              \
+        .get_saved_list_cb = NULL,             \
+        .delete_saved_cb  = NULL,              \
     }
 
 /**
