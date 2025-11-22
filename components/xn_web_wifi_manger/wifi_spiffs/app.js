@@ -589,6 +589,7 @@
     bindEvents();
     startStatusPolling();
     loadSavedList();
+    loadScanList();
   }
 
   document.addEventListener('DOMContentLoaded', bootstrap);
