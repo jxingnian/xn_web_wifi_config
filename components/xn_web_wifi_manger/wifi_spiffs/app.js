@@ -45,6 +45,9 @@
     connectMessage: null,
   };
 
+  var lastStatusState = 0;
+  var lastStatusSsid = null;
+
   /**
    * 初始化 DOM 引用。
    *
@@ -184,6 +187,16 @@
     if (dom.statusSignalBar) {
       var level = levelFromRssi(rssi);
       dom.statusSignalBar.setAttribute('data-level', String(level));
+    }
+
+    var prevState = lastStatusState;
+    var prevSsid = lastStatusSsid;
+
+    lastStatusState = state;
+    lastStatusSsid = ssid;
+
+    if (state === 2 && (prevState !== 2 || prevSsid !== ssid)) {
+      loadSavedList();
     }
   }
 
