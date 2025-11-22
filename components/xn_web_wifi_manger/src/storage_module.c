@@ -63,7 +63,7 @@ static bool wifi_storage_is_same_ssid(const wifi_config_t *a, const wifi_config_
  * - 若 config 为 NULL，使用 WIFI_STORAGE_DEFAULT_CONFIG；
  * - 强制保证 max_wifi_num >= 1。
  */
-esp_err_t xn_wifi_storage_init(const wifi_storage_config_t *config)
+esp_err_t wifi_storage_init(const wifi_storage_config_t *config)
 {
     if (s_storage_inited) {
         return ESP_OK;
@@ -96,7 +96,7 @@ esp_err_t xn_wifi_storage_init(const wifi_storage_config_t *config)
  *
  * @note 若当前没有任何配置，返回 ESP_OK 且 *count_out = 0。
  */
-esp_err_t xn_wifi_storage_load_all(wifi_config_t *configs, uint8_t *count_out)
+esp_err_t wifi_storage_load_all(wifi_config_t *configs, uint8_t *count_out)
 {
     if (!s_storage_inited) {
         return ESP_ERR_INVALID_STATE;
@@ -163,7 +163,7 @@ esp_err_t xn_wifi_storage_load_all(wifi_config_t *configs, uint8_t *count_out)
  * - 若不存在且列表未满：插入到首位；
  * - 若不存在且列表已满：插入到首位并丢弃最后一个。
  */
-esp_err_t xn_wifi_storage_on_connected(const wifi_config_t *config)
+esp_err_t wifi_storage_on_connected(const wifi_config_t *config)
 {
     if (!s_storage_inited) {
         return ESP_ERR_INVALID_STATE;
@@ -184,7 +184,7 @@ esp_err_t xn_wifi_storage_on_connected(const wifi_config_t *config)
     }
 
     uint8_t   count = 0;
-    esp_err_t ret   = xn_wifi_storage_load_all(list, &count);
+    esp_err_t ret   = wifi_storage_load_all(list, &count);
     if (ret != ESP_OK) {
         free(list);
         return ret;
@@ -260,7 +260,7 @@ esp_err_t xn_wifi_storage_on_connected(const wifi_config_t *config)
  *
  * 若删除后列表为空，则直接擦除 WIFI_LIST_KEY。
  */
-esp_err_t xn_wifi_storage_delete_by_ssid(const char *ssid)
+esp_err_t wifi_storage_delete_by_ssid(const char *ssid)
 {
     if (!s_storage_inited) {
         return ESP_ERR_INVALID_STATE;
@@ -280,7 +280,7 @@ esp_err_t xn_wifi_storage_delete_by_ssid(const char *ssid)
     }
 
     uint8_t   count = 0;
-    esp_err_t ret   = xn_wifi_storage_load_all(list, &count);
+    esp_err_t ret   = wifi_storage_load_all(list, &count);
     if (ret != ESP_OK) {
         free(list);
         return ret;

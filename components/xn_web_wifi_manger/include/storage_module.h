@@ -55,7 +55,7 @@ typedef struct {
  *  - ESP_ERR_INVALID_ARG    : 配置非法（理论上不会出现，内部已做兜底）
  *  - 其它 esp_err_t         : NVS 初始化相关错误
  */
-esp_err_t xn_wifi_storage_init(const wifi_storage_config_t *config);
+esp_err_t wifi_storage_init(const wifi_storage_config_t *config);
 
 /**
  * @brief 读取所有已保存的 WiFi 配置
@@ -73,7 +73,7 @@ esp_err_t xn_wifi_storage_init(const wifi_storage_config_t *config);
  *  - ESP_ERR_INVALID_STATE : 模块未初始化
  *  - 其它 esp_err_t      : NVS 读失败 / 数据格式异常等
  */
-esp_err_t xn_wifi_storage_load_all(wifi_config_t *configs, uint8_t *count_out);
+esp_err_t wifi_storage_load_all(wifi_config_t *configs, uint8_t *count_out);
 
 /**
  * @brief 在 WiFi 成功连接后更新存储列表
@@ -94,7 +94,7 @@ esp_err_t xn_wifi_storage_load_all(wifi_config_t *configs, uint8_t *count_out);
  *  - ESP_ERR_INVALID_STATE: 模块未初始化
  *  - 其它 esp_err_t       : NVS 写失败等
  */
-esp_err_t xn_wifi_storage_on_connected(const wifi_config_t *config);
+esp_err_t wifi_storage_on_connected(const wifi_config_t *config);
 
 /**
  * @brief 按 SSID 删除已保存的 WiFi 配置
@@ -110,6 +110,6 @@ esp_err_t xn_wifi_storage_on_connected(const wifi_config_t *config);
  *  - ESP_ERR_INVALID_STATE: 模块未初始化
  *  - 其它 esp_err_t       : NVS 读/写失败等
  */
-esp_err_t xn_wifi_storage_delete_by_ssid(const char *ssid);
+esp_err_t wifi_storage_delete_by_ssid(const char *ssid);
 
 #endif /* STORAGE_MODULE_H */

@@ -71,7 +71,7 @@ typedef struct {
  * @code
  * wifi_manage_config_t cfg = WIFI_MANAGE_DEFAULT_CONFIG();
  * strcpy(cfg.ap_ssid, "MyAP");
- * xn_wifi_manage_init(&cfg);
+ * wifi_manage_init(&cfg);
  * @endcode
  */
 #define WIFI_MANAGE_DEFAULT_CONFIG()                       \
@@ -100,6 +100,6 @@ typedef struct {
  *      - ESP_OK      : 初始化成功
  *      - 其它 esp_err_t : 由底层子模块返回的错误码
  */
-esp_err_t xn_wifi_manage_init(const wifi_manage_config_t *config);
+esp_err_t wifi_manage_init(const wifi_manage_config_t *config);
 
 #endif /* XN_WIFI_MANAGE_H */

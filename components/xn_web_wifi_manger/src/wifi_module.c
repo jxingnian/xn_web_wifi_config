@@ -72,7 +72,7 @@ static void wifi_module_event_handler(void *arg,
         break;
 
     case WIFI_EVENT_SCAN_DONE:
-        /* 扫描完成（xn_wifi_module_scan 为同步扫描，此处通常也不处理） */
+        /* 扫描完成（wifi_module_scan 为同步扫描，此处通常也不处理） */
         break;
 
     case WIFI_EVENT_STA_START:
@@ -212,7 +212,7 @@ static esp_err_t wifi_module_init_nvs(void)
  * - 可多次调用，仅第一次有效。
  * - config 为 NULL 时使用 WIFI_MODULE_DEFAULT_CONFIG。
  */
-esp_err_t xn_wifi_module_init(const wifi_module_config_t *config)
+esp_err_t wifi_module_init(const wifi_module_config_t *config)
 {
     /* 配置加载：优先使用用户配置，否则使用默认配置 */
     if (config == NULL) {
@@ -357,7 +357,7 @@ esp_err_t xn_wifi_module_init(const wifi_module_config_t *config)
  * @param ssid     目标 AP SSID，必须非 NULL 且非空
  * @param password AP 密码，可为 NULL/空串 表示开放网络
  */
-esp_err_t xn_wifi_module_connect(const char *ssid, const char *password)
+esp_err_t wifi_module_connect(const char *ssid, const char *password)
 {
     if (!s_wifi_inited) {
         return ESP_ERR_INVALID_STATE;
@@ -428,7 +428,7 @@ esp_err_t xn_wifi_module_connect(const char *ssid, const char *password)
  * @param results     输出数组，长度由 *count_inout 指定
  * @param count_inout 入参：results 最大容量；出参：实际返回数量
  */
-esp_err_t xn_wifi_module_scan(wifi_module_scan_result_t *results, uint16_t *count_inout)
+esp_err_t wifi_module_scan(wifi_module_scan_result_t *results, uint16_t *count_inout)
 {
     if (!s_wifi_inited || !s_wifi_cfg.enable_sta ||
         results == NULL || count_inout == NULL || *count_inout == 0) {

@@ -158,7 +158,7 @@ typedef struct {
  *     web_module_config_t cfg = WEB_MODULE_DEFAULT_CONFIG();
  *     cfg.scan_cb       = ...;
  *     cfg.configure_cb  = ...;
- *     xn_web_module_start(&cfg);
+ *     web_module_start(&cfg);
  */
 #define WEB_MODULE_DEFAULT_CONFIG()            \
     (web_module_config_t){                     \
@@ -189,7 +189,7 @@ typedef struct {
  *      - ESP_OK   : 启动成功（HTTP Server 已运行）
  *      - 其他     : 启动失败，具体错误由底层返回
  */
-esp_err_t xn_web_module_start(const web_module_config_t *config);
+esp_err_t web_module_start(const web_module_config_t *config);
 
 /**
  * @brief 停止 Web 配网模块
@@ -201,6 +201,6 @@ esp_err_t xn_web_module_start(const web_module_config_t *config);
  *      - ESP_OK   : 停止成功或模块本就未启动
  *      - 其他     : 关闭 HTTP Server 过程中的错误
  */
-esp_err_t xn_web_module_stop(void);
+esp_err_t web_module_stop(void);
 
 #endif /* WEB_MODULE_H */

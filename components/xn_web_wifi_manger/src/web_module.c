@@ -453,7 +453,7 @@ static esp_err_t web_mount_spiffs(void)
  * - 启动 HTTP Server 并注册 URI
  * - 记录上层回调配置
  */
-esp_err_t xn_web_module_start(const web_module_config_t *config)
+esp_err_t web_module_start(const web_module_config_t *config)
 {
     /* 已经启动则直接返回 */
     if (s_httpd != NULL) {
@@ -489,7 +489,7 @@ esp_err_t xn_web_module_start(const web_module_config_t *config)
  * 仅停止 HTTP Server。SPIFFS 可在整个应用生命周期中保持挂载，
  * 如需卸载可在上层调用 esp_vfs_spiffs_unregister("wifi_spiffs")。
  */
-esp_err_t xn_web_module_stop(void)
+esp_err_t web_module_stop(void)
 {
     if (s_httpd != NULL) {
         httpd_stop(s_httpd);

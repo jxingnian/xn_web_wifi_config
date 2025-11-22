@@ -24,7 +24,7 @@
 #include "xn_wifi_manage.h"
 
 /* 日志 TAG（如需日志输出，使用 ESP_LOGx(TAG, ...)） */
-static const char *TAG = "xn_wifi_manage";
+static const char *TAG = "wifi_manage";
 
 /* 当前 WiFi 管理状态 */
 static wifi_manage_state_t  s_wifi_manage_state = WIFI_MANAGE_STATE_DISCONNECTED;
@@ -59,7 +59,7 @@ static esp_err_t web_cb_scan(web_scan_result_t *list, uint16_t *count_inout)
     }
 
     /* 调用底层 WiFi 模块执行扫描 */
-    esp_err_t ret = xn_wifi_module_scan(tmp, &count);
+    esp_err_t ret = wifi_module_scan(tmp, &count);
     if (ret != ESP_OK) {
         free(tmp);
         return ret;
@@ -83,7 +83,7 @@ static esp_err_t web_cb_scan(web_scan_result_t *list, uint16_t *count_inout)
  */
 static esp_err_t web_cb_configure(const char *ssid, const char *password)
 {
-    return xn_wifi_module_connect(ssid, password);
+    return wifi_module_connect(ssid, password);
 }
 
 /* -------------------- Web 回调：获取当前 WiFi 状态 -------------------- */
@@ -172,7 +172,7 @@ static esp_err_t web_cb_get_saved(web_saved_wifi_t *list, uint8_t *count_inout)
     }
 
     uint8_t   count = 0;
-    esp_err_t ret   = xn_wifi_storage_load_all(cfg_list, &count);
+    esp_err_t ret   = wifi_storage_load_all(cfg_list, &count);
     if (ret != ESP_OK) {
         free(cfg_list);
         return ret;
@@ -221,7 +221,7 @@ static esp_err_t web_cb_connect_saved(const char *ssid)
     }
 
     uint8_t   count = 0;
-    esp_err_t ret   = xn_wifi_storage_load_all(cfg_list, &count);
+    esp_err_t ret   = wifi_storage_load_all(cfg_list, &count);
     if (ret != ESP_OK) {
         free(cfg_list);
         return ret;
@@ -235,7 +235,7 @@ static esp_err_t web_cb_connect_saved(const char *ssid)
             const char *pwd = (cfg_list[i].sta.password[0] == '\0')
                                   ? NULL
                                   : (const char *)cfg_list[i].sta.password;
-            ret = xn_wifi_module_connect(ssid, pwd);
+            ret = wifi_module_connect(ssid, pwd);
             free(cfg_list);
             return ret;
         }
@@ -251,7 +251,7 @@ static esp_err_t web_cb_connect_saved(const char *ssid)
  */
 static esp_err_t web_cb_delete_saved(const char *ssid)
 {
-    return xn_wifi_storage_delete_by_ssid(ssid);
+    return wifi_storage_delete_by_ssid(ssid);
 }
 
 /* -------------------- Web 回调：重置状态机重试状态 -------------------- */
@@ -288,7 +288,7 @@ static void wifi_manage_on_wifi_event(wifi_module_event_t event)
         /* 将当前配置上报给存储模块，用于调整优先级等策略 */
         wifi_config_t current_cfg = {0};
         if (esp_wifi_get_config(WIFI_IF_STA, &current_cfg) == ESP_OK) {
-            (void)xn_wifi_storage_on_connected(&current_cfg);
+            (void)wifi_storage_on_connected(&current_cfg);
         }
         break;
     }
@@ -318,7 +318,7 @@ static void wifi_manage_on_wifi_event(wifi_module_event_t event)
  *
  * 按当前状态决定是否发起连接、切换状态或等待重试。
  */
-static void xn_wifi_manage_step(void)
+static void wifi_manage_step(void)
 {
     switch (s_wifi_manage_state) {
     case WIFI_MANAGE_STATE_DISCONNECTED: {
@@ -337,7 +337,7 @@ static void xn_wifi_manage_step(void)
         wifi_config_t list[max_num];
         uint8_t       count = 0;
 
-        if (xn_wifi_storage_load_all(list, &count) != ESP_OK || count == 0) {
+        if (wifi_storage_load_all(list, &count) != ESP_OK || count == 0) {
             /* 没有可用配置，交由上层决定是否启用纯 AP 配网等逻辑 */
             break;
         }
@@ -364,7 +364,7 @@ static void xn_wifi_manage_step(void)
                                    : (const char *)cfg->sta.password;
 
         /* 尝试发起连接，成功则等待事件回调，失败则立即切换到下一条 */
-        if (xn_wifi_module_connect(ssid, password) == ESP_OK) {
+        if (wifi_module_connect(ssid, password) == ESP_OK) {
             s_wifi_connecting = true;
         } else {
             s_wifi_try_index++;
@@ -414,7 +414,7 @@ static void wifi_manage_task(void *arg)
     (void)arg;
 
     for (;;) {
-        xn_wifi_manage_step();
+        wifi_manage_step();
         vTaskDelay(pdMS_TO_TICKS(WIFI_MANAGE_STEP_INTERVAL_MS));
     }
 }
@@ -430,7 +430,7 @@ static void wifi_manage_task(void *arg)
  * 4. 初始化 Web 配网模块（HTTP 服务与回调）
  * 5. 创建管理任务，启动状态机
  */
-esp_err_t xn_wifi_manage_init(const wifi_manage_config_t *config)
+esp_err_t wifi_manage_init(const wifi_manage_config_t *config)
 {
     /* 使用默认配置或上层传入配置 */
     if (config == NULL) {
@@ -465,7 +465,7 @@ esp_err_t xn_wifi_manage_init(const wifi_manage_config_t *config)
     wifi_cfg.event_cb = wifi_manage_on_wifi_event;
 
     /* 初始化底层 WiFi 模块 */
-    esp_err_t ret = xn_wifi_module_init(&wifi_cfg);
+    esp_err_t ret = wifi_module_init(&wifi_cfg);
     if (ret != ESP_OK) {
         return ret;
     }
@@ -480,7 +480,7 @@ esp_err_t xn_wifi_manage_init(const wifi_manage_config_t *config)
         storage_cfg.max_wifi_num = (uint8_t)s_wifi_cfg.save_wifi_count;
     }
 
-    ret = xn_wifi_storage_init(&storage_cfg);
+    ret = wifi_storage_init(&storage_cfg);
     if (ret != ESP_OK) {
         return ret;
     }
@@ -502,7 +502,7 @@ esp_err_t xn_wifi_manage_init(const wifi_manage_config_t *config)
     web_cfg.delete_saved_cb  = web_cb_delete_saved;
     web_cfg.reset_retry_cb   = web_cb_reset_retry;
 
-    ret = xn_web_module_start(&web_cfg);
+    ret = web_module_start(&web_cfg);
     if (ret != ESP_OK) {
         return ret;
     }

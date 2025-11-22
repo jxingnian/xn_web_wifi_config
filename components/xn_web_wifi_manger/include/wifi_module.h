@@ -3,13 +3,13 @@
  * @Date: 2025-11-22 16:37:33
  * @LastEditors: xingnian && jixingnian@gmail.com
  * @LastEditTime: 2025-11-22 22:00:00
- * @FilePath: \xn_web_wifi_config\components\xn_web_wifi_manger\include\wifi_module.h
+ * @FilePath: \web_wifi_config\components\web_wifi_manger\include\wifi_module.h
  * @Description: WiFi 底层封装，仅负责 STA/AP 初始化、连接与事件上报
  *
- * 上层（如 xn_wifi_manage）通过：
- *  - xn_wifi_module_init()  配置并初始化 WiFi 驱动、STA/AP 接口；
- *  - xn_wifi_module_connect()  发起一次 STA 连接流程；
- *  - xn_wifi_module_scan()     执行同步扫描，获取附近 AP 列表；
+ * 上层（如 wifi_manage）通过：
+ *  - wifi_module_init()  配置并初始化 WiFi 驱动、STA/AP 接口；
+ *  - wifi_module_connect()  发起一次 STA 连接流程；
+ *  - wifi_module_scan()     执行同步扫描，获取附近 AP 列表；
  * 以及注册的 event_cb 获取 WiFi 状态变化。
  */
 
@@ -119,7 +119,7 @@ typedef struct {
  *      - ESP_ERR_NO_MEM 等      底层资源不足
  *      - 其它 esp_err_t         具体错误见日志
  */
-esp_err_t xn_wifi_module_init(const wifi_module_config_t *config);
+esp_err_t wifi_module_init(const wifi_module_config_t *config);
 
 /**
  * @brief 以 STA 模式连接指定 AP
@@ -135,7 +135,7 @@ esp_err_t xn_wifi_module_init(const wifi_module_config_t *config);
  *      - ESP_ERR_INVALID_STATE  WiFi 模块未初始化或未启用 STA
  *      - 其它 esp_err_t         具体错误见日志
  */
-esp_err_t xn_wifi_module_connect(const char *ssid, const char *password);
+esp_err_t wifi_module_connect(const char *ssid, const char *password);
 
 /**
  * @brief 同步扫描附近可见的 WiFi 列表
@@ -150,6 +150,6 @@ esp_err_t xn_wifi_module_connect(const char *ssid, const char *password);
  *      - ESP_ERR_INVALID_STATE  WiFi 模块未初始化
  *      - 其它 esp_err_t         具体错误见日志
  */
-esp_err_t xn_wifi_module_scan(wifi_module_scan_result_t *results, uint16_t *count_inout);
+esp_err_t wifi_module_scan(wifi_module_scan_result_t *results, uint16_t *count_inout);
 
 #endif /* WIFI_MODULE_H */
