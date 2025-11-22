@@ -1,7 +1,9 @@
 idf_component_register(
     SRCS 
-        "src/xn_wifi.c" 
-        "src/xn_web.c"
+        "src/xn_wifi_manage.c" 
+        "src/wifi_module.c" 
+        "src/web_module.c" 
+        "src/storage_module.c"
     INCLUDE_DIRS 
         "include"
     REQUIRES 

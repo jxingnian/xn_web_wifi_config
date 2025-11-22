@@ -2,7 +2,7 @@
  * @Author: 星年 && jixingnian@gmail.com
  * @Date: 2025-11-22 16:24:42
  * @LastEditors: xingnian jixingnian@gmail.com
- * @LastEditTime: 2025-11-22 17:24:29
+ * @LastEditTime: 2025-11-22 17:41:03
  * @FilePath: \xn_web_wifi_config\components\xn_web_wifi_manger\include\xn_wifi_manage.h
  * @Description: 提供管理wifi的接口
  * 
@@ -13,6 +13,8 @@
 #define XN_WIFI_MANAGE_H
 
 #include "esp_err.h"
+
+#define WIFI_MANAGE_STEP_INTERVAL_MS 1000   // WiFi管理状态机运行间隔时间(ms)
 
 /**
  * @brief wifi管理的状态
@@ -56,12 +58,4 @@ typedef struct {
  */
 esp_err_t xn_wifi_manage_init(const wifi_manage_config_t *config);
 
-
 #endif
-
-
-
-
-
-
-
