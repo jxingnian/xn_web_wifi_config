@@ -220,7 +220,11 @@
         '<tr>' +
           '<td>' + (i + 1) + '</td>' +
           '<td>' + ssid + '</td>' +
-          '<td><button type="button" class="btn" data-action="delete-saved" data-ssid="' + ssid + '">删除</button></td>' +
+          '<td>' +
+            '<button type="button" class="btn btn-primary" data-action="connect-saved" data-ssid="' + ssid + '">连接</button>' +
+            ' ' +
+            '<button type="button" class="btn" data-action="delete-saved" data-ssid="' + ssid + '">删除</button>' +
+          '</td>' +
         '</tr>'
       );
     }
@@ -274,6 +278,32 @@
       })
       .catch(function () {
         // 删除失败时暂不提示，保持列表不变
+      });
+  }
+
+  /**
+   * 连接一条已保存 WiFi，按 SSID 标识。
+   *
+   * 实际连接过程由后端状态机驱动，这里仅发起一次连接请求。
+   */
+  function connectSavedWifi(ssid) {
+    if (!ssid || !window.fetch) {
+      return;
+    }
+
+    fetch('/api/wifi/saved/connect?ssid=' + encodeURIComponent(ssid), {
+      method: 'POST',
+    })
+      .then(function (res) {
+        if (!res.ok) {
+          throw new Error('http ' + res.status);
+        }
+      })
+      .then(function () {
+        // 连接请求发起后，依赖上方“当前 WiFi 状态”模块的轮询展示进度
+      })
+      .catch(function () {
+        // 连接失败时暂不弹框，由状态模块展示“连接失败”状态
       });
   }
 
@@ -377,7 +407,7 @@
       });
     }
 
-    // 已保存 WiFi 列表中的删除按钮（事件委托）
+    // 已保存 WiFi 列表中的“连接 / 删除”按钮（事件委托）
     if (dom.savedBody) {
       dom.savedBody.addEventListener('click', function (event) {
         var target = event.target;
@@ -390,6 +420,11 @@
           var ssid = target.getAttribute('data-ssid') || '';
           if (ssid) {
             deleteSavedWifi(ssid);
+          }
+        } else if (action === 'connect-saved') {
+          var ssid2 = target.getAttribute('data-ssid') || '';
+          if (ssid2) {
+            connectSavedWifi(ssid2);
           }
         }
       });

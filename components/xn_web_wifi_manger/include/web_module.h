@@ -2,7 +2,7 @@
  * @Author: 星年 && jixingnian@gmail.com
  * @Date: 2025-11-22 21:45:00
  * @LastEditors: xingnian jixingnian@gmail.com
- * @LastEditTime: 2025-11-22 21:49:41
+ * @LastEditTime: 2025-11-22 22:51:55
  * @FilePath: \xn_web_wifi_config\components\xn_web_wifi_manger\include\web_module.h
  * @Description: Web 配网模块对外接口（HTTP 服务器 + 回调驱动的业务能力）
  *
@@ -76,6 +76,11 @@ typedef esp_err_t (*web_get_saved_list_cb_t)(web_saved_wifi_info_t *list, size_t
 typedef esp_err_t (*web_delete_saved_cb_t)(const char *ssid);
 
 /**
+ * @brief 连接已保存 WiFi 的回调（按 SSID 匹配）
+ */
+typedef esp_err_t (*web_connect_saved_cb_t)(const char *ssid);
+
+/**
  * @brief Web 模块配置
  *
  * 该配置在初始化时传入一次，模块内部会保存副本。
@@ -85,6 +90,7 @@ typedef struct {
     web_get_status_cb_t   get_status_cb;    ///< 查询当前 WiFi 状态回调
     web_get_saved_list_cb_t get_saved_list_cb; ///< 获取已保存 WiFi 列表回调
     web_delete_saved_cb_t delete_saved_cb;  ///< 删除已保存 WiFi 的回调
+    web_connect_saved_cb_t connect_saved_cb; ///< 连接已保存 WiFi 的回调
 } web_module_config_t;
 
 /**
@@ -96,6 +102,7 @@ typedef struct {
         .get_status_cb    = NULL,              \
         .get_saved_list_cb = NULL,             \
         .delete_saved_cb  = NULL,              \
+        .connect_saved_cb = NULL,              \
     }
 
 /**

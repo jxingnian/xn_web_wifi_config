@@ -307,6 +307,46 @@ static esp_err_t web_module_saved_delete_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+/**
+ * @brief /api/wifi/saved/connect：按 SSID 触发连接已保存 WiFi
+ *
+ * 仅负责解析参数并调用上层回调，不直接操作 WiFi，
+ * 真正的连接过程仍由上层状态机驱动。
+ */
+static esp_err_t web_module_saved_connect_handler(httpd_req_t *req)
+{
+    if (s_web_cfg.connect_saved_cb == NULL) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "connect not supported");
+        return ESP_OK;
+    }
+
+    /* 解析 URL 查询字符串中的 ssid 参数 */
+    char query[64] = {0};
+    char ssid[32]  = {0};
+
+    if (httpd_req_get_url_query_str(req, query, sizeof(query)) != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "missing query");
+        return ESP_OK;
+    }
+
+    if (httpd_query_key_value(query, "ssid", ssid, sizeof(ssid)) != ESP_OK || ssid[0] == '\0') {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "missing ssid");
+        return ESP_OK;
+    }
+
+    esp_err_t ret = s_web_cfg.connect_saved_cb(ssid);
+    if (ret != ESP_OK) {
+        httpd_resp_send_err(req,
+                            HTTPD_500_INTERNAL_SERVER_ERROR,
+                            "connect failed");
+        return ESP_OK;
+    }
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_send(req, "{\"ok\":true}", strlen("{\"ok\":true}"));
+    return ESP_OK;
+}
+
 /* -------------------- HTTP 服务器启动 -------------------- */
 
 /**
@@ -399,6 +439,17 @@ static esp_err_t web_module_start_server(void)
             .user_ctx = NULL,
         };
         httpd_register_uri_handler(s_http_server, &uri_saved_del);
+    }
+
+    /* 连接已保存 WiFi 接口（可选） */
+    if (s_web_cfg.connect_saved_cb != NULL) {
+        static const httpd_uri_t uri_saved_connect = {
+            .uri      = "/api/wifi/saved/connect",
+            .method   = HTTP_POST,
+            .handler  = web_module_saved_connect_handler,
+            .user_ctx = NULL,
+        };
+        httpd_register_uri_handler(s_http_server, &uri_saved_connect);
     }
 
     return ESP_OK;

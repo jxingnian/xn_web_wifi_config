@@ -2,7 +2,7 @@
  * @Author: 星年 && jixingnian@gmail.com
  * @Date: 2025-11-22 16:24:42
  * @LastEditors: xingnian jixingnian@gmail.com
- * @LastEditTime: 2025-11-22 22:47:30
+ * @LastEditTime: 2025-11-22 22:56:45
  * @FilePath: \xn_web_wifi_config\components\xn_web_wifi_manger\src\xn_wifi_manage.c
  * @Description: WiFi 管理模块实现（封装 WiFi / 存储 / Web 配网，提供自动重连与状态管理）
  */
@@ -212,6 +212,75 @@ static esp_err_t wifi_manage_get_web_saved_list(web_saved_wifi_info_t *list, siz
 static esp_err_t wifi_manage_delete_web_saved(const char *ssid)
 {
     return wifi_storage_delete_by_ssid(ssid);
+}
+
+/* -------------------- Web 回调：从已保存列表触发连接 -------------------- */
+/**
+ * @brief 提供给 Web 的“连接已保存 WiFi”回调
+ *
+ * 实现思路：
+ * 1. 在存储列表中找到目标 SSID，并通过 wifi_storage_on_connected()
+ *    将其提升为最高优先级；
+ * 2. 主动断开当前 STA 连接，让已有状态机在收到“断开”事件后，
+ *    按最新的优先级顺序自动重连。
+ *
+ * 不直接改动状态机内部逻辑，仅通过“调整优先级 + 触发一次断开”
+ * 来驱动后续行为，避免与自动重连策略产生直接冲突。
+ */
+static esp_err_t wifi_manage_connect_web_saved(const char *ssid)
+{
+    if (ssid == NULL || ssid[0] == '\0') {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    /* 读取当前已保存列表，确认该 SSID 存在 */
+    uint8_t max_num = (s_wifi_cfg.save_wifi_count <= 0)
+                          ? 1
+                          : (uint8_t)s_wifi_cfg.save_wifi_count;
+
+    wifi_config_t *configs = (wifi_config_t *)malloc(max_num * sizeof(wifi_config_t));
+    if (configs == NULL) {
+        return ESP_ERR_NO_MEM;
+    }
+
+    uint8_t   count = 0;
+    esp_err_t ret   = wifi_storage_load_all(configs, &count);
+    if (ret != ESP_OK || count == 0) {
+        free(configs);
+        return ret;
+    }
+
+    int found_index = -1;
+    for (uint8_t i = 0; i < count; i++) {
+        if (configs[i].sta.ssid[0] == '\0') {
+            continue;
+        }
+        if (strncmp((const char *)configs[i].sta.ssid,
+                    ssid,
+                    sizeof(configs[i].sta.ssid)) == 0) {
+            found_index = (int)i;
+            break;
+        }
+    }
+
+    if (found_index < 0) {
+        free(configs);
+        return ESP_ERR_NOT_FOUND;
+    }
+
+    /* 通过存储模块将该配置提升为最高优先级 */
+    ret = wifi_storage_on_connected(&configs[found_index]);
+    free(configs);
+
+    if (ret != ESP_OK) {
+        return ret;
+    }
+
+    /* 主动断开当前连接，让状态机在后续收到“断开”事件后，
+     * 按最新优先级从首选 WiFi 开始重新尝试连接。 */
+    (void)esp_wifi_disconnect();
+
+    return ESP_OK;
 }
 
 /* -------------------- WiFi 模块事件回调 -------------------- */
@@ -456,6 +525,7 @@ esp_err_t wifi_manage_init(const wifi_manage_config_t *config)
         web_cfg.get_status_cb     = wifi_manage_get_web_status;
         web_cfg.get_saved_list_cb = wifi_manage_get_web_saved_list;
         web_cfg.delete_saved_cb   = wifi_manage_delete_web_saved;
+        web_cfg.connect_saved_cb  = wifi_manage_connect_web_saved;
 
         ret = web_module_init(&web_cfg);
         if (ret != ESP_OK) {
