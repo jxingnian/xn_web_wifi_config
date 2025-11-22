@@ -1,0 +1,360 @@
+/*
+ * @Author: 星年 && jixingnian@gmail.com
+ * @Date: 2025-11-22 21:40:00
+ * @LastEditors: xingnian jixingnian@gmail.com
+ * @LastEditTime: 2025-11-22 21:40:00
+ * @FilePath: \xn_web_wifi_config\components\xn_web_wifi_manger\wifi_spiffs\app.css
+ * @Description: Web 配网页面的基础样式（暗色主题 + 简洁卡片布局）
+ *
+ * 只关注结构与观感，不绑定任何具体业务逻辑。
+ */
+
+/* -------------------- 全局基础设置 -------------------- */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    Helvetica, Arial, sans-serif;
+  background: #020617; /* 深色背景，减弱干扰，突出内容卡片 */
+  color: #e5e7eb;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+/* -------------------- 页面整体布局 -------------------- */
+
+.page {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  padding: 24px;
+}
+
+.page-inner {
+  width: 100%;
+  max-width: 960px; /* 限制阅读宽度，保持视觉集中 */
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.page-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.page-title {
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.page-subtitle {
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+.page-main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* -------------------- 通用卡片与徽章 -------------------- */
+
+.card {
+  background: rgba(15, 23, 42, 0.96);
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  box-shadow: 0 18px 32px rgba(15, 23, 42, 0.9);
+  padding: 14px 16px 16px;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.card-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.card-extra {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.card-body {
+  font-size: 13px;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  font-size: 11px;
+  gap: 4px;
+}
+
+.badge-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #f97316; /* 默认视为未连接，可在 JS 中按需切换 */
+}
+
+/* -------------------- 状态模块布局 -------------------- */
+
+.status-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.status-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.status-label {
+  color: #9ca3af;
+}
+
+.status-value {
+  font-weight: 500;
+  color: #e5e7eb;
+  word-break: break-all;
+}
+
+.status-visual {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* 简单的信号条可视化：根据 data-level 控制亮度 */
+.signal-bar {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  width: 60px;
+  height: 28px;
+}
+
+.signal-bar span {
+  flex: 1;
+  border-radius: 3px 3px 0 0;
+  background: rgba(59, 130, 246, 0.8);
+  opacity: 0.25;
+}
+
+.signal-bar span:nth-child(1) {
+  height: 25%;
+}
+
+.signal-bar span:nth-child(2) {
+  height: 45%;
+}
+
+.signal-bar span:nth-child(3) {
+  height: 70%;
+}
+
+.signal-bar span:nth-child(4) {
+  height: 100%;
+}
+
+.signal-bar[data-level="1"] span:nth-child(1),
+.signal-bar[data-level="2"] span:nth-child(-n + 3),
+.signal-bar[data-level="3"] span {
+  opacity: 1;
+}
+
+/* -------------------- 表格与工具栏 -------------------- */
+
+.table-wrapper {
+  border-radius: 10px;
+  border: 1px solid rgba(31, 41, 55, 0.9);
+  overflow: hidden;
+  background: rgba(15, 23, 42, 0.9);
+}
+
+.simple-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.simple-table thead {
+  background: rgba(15, 23, 42, 0.98);
+}
+
+.simple-table th,
+.simple-table td {
+  padding: 7px 10px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.simple-table th {
+  font-weight: 500;
+  color: #9ca3af;
+  border-bottom: 1px solid rgba(55, 65, 81, 0.9);
+}
+
+.simple-table td {
+  border-top: 1px solid rgba(30, 41, 59, 0.9);
+}
+
+.simple-table tbody tr:nth-child(2n) {
+  background: rgba(15, 23, 42, 0.7);
+}
+
+.simple-table tbody tr:hover {
+  background: rgba(30, 64, 175, 0.4);
+}
+
+.empty-hint {
+  margin: 8px 10px;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.toolbar-row {
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: 10px;
+}
+
+/* -------------------- 按钮与表单 -------------------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: none;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, box-shadow 0.15s ease,
+    transform 0.1s ease;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #2563eb, #4f46e5);
+  color: #f9fafb;
+  box-shadow: 0 12px 28px rgba(37, 99, 235, 0.45);
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, #1d4ed8, #4338ca);
+  transform: translateY(-1px);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+  box-shadow: none;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.form-label {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.form-input {
+  border-radius: 8px;
+  border: 1px solid rgba(55, 65, 81, 0.9);
+  padding: 6px 9px;
+  font-size: 13px;
+  background: rgba(15, 23, 42, 0.98);
+  color: #e5e7eb;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.form-input:focus {
+  border-color: rgba(59, 130, 246, 0.9);
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.6);
+}
+
+.form-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.form-message {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+/* -------------------- 响应式适配 -------------------- */
+
+@media (max-width: 720px) {
+  .page {
+    padding: 14px;
+  }
+
+  .page-inner {
+    gap: 12px;
+  }
+
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .status-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+

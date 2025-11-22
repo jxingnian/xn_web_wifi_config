@@ -1,8 +1,8 @@
 /*
  * @Author: 星年 && jixingnian@gmail.com
  * @Date: 2025-11-22 16:24:42
- * @LastEditors: xingnian && jixingnian@gmail.com
- * @LastEditTime: 2025-11-22 20:30:00
+ * @LastEditors: xingnian jixingnian@gmail.com
+ * @LastEditTime: 2025-11-22 21:30:38
  * @FilePath: \xn_web_wifi_config\components\xn_web_wifi_manger\src\xn_wifi_manage.c
  * @Description: WiFi 管理模块实现（封装 WiFi / 存储 / Web 配网，提供自动重连与状态管理）
  */
@@ -38,232 +38,58 @@ static bool       s_wifi_connecting   = false;  /* 当前是否有一次 STA 连
 static uint8_t    s_wifi_try_index    = 0;      /* 本轮遍历中，正在尝试的 WiFi 下标 */
 static TickType_t s_connect_failed_ts = 0;      /* 最近一次全轮尝试失败的时间戳 */
 
-/* -------------------- Web 回调：扫描附近 WiFi -------------------- */
+/* -------------------- Web 回调：查询当前 WiFi 状态 -------------------- */
 /**
- * @brief Web 模块回调：同步扫描附近 AP
+ * @brief 提供给 Web 模块的 WiFi 状态查询回调
  *
- * @param list         输出结果数组（由 Web 模块分配）
- * @param count_inout  入参为数组最大容量，出参为实际填充数量
+ * 仅返回网页展示所需的少量字段：
+ * - 是否已连接；
+ * - 当前 SSID；
+ * - 当前 IPv4 地址；
+ * - 当前 RSSI。
  */
-static esp_err_t web_cb_scan(web_scan_result_t *list, uint16_t *count_inout)
+static esp_err_t wifi_manage_get_web_status(web_wifi_status_t *out)
 {
-    if (list == NULL || count_inout == NULL || *count_inout == 0) {
+    if (out == NULL) {
         return ESP_ERR_INVALID_ARG;
     }
 
-    uint16_t                   count = *count_inout;
-    /* 临时缓冲区，用于承接底层扫描结果 */
-    wifi_module_scan_result_t *tmp   = calloc(count, sizeof(wifi_module_scan_result_t));
-    if (tmp == NULL) {
-        return ESP_ERR_NO_MEM;
-    }
+    /* 统一设置默认值，避免调用方看到未初始化字段 */
+    memset(out, 0, sizeof(*out));
+    out->connected = false;
+    strncpy(out->ssid, "-", sizeof(out->ssid));
+    out->ssid[sizeof(out->ssid) - 1] = '\0';
+    strncpy(out->ip, "-", sizeof(out->ip));
+    out->ip[sizeof(out->ip) - 1] = '\0';
 
-    /* 调用底层 WiFi 模块执行扫描 */
-    esp_err_t ret = wifi_module_scan(tmp, &count);
-    if (ret != ESP_OK) {
-        free(tmp);
-        return ret;
-    }
-
-    /* 拷贝 SSID / RSSI 到 Web 层定义的结构体 */
-    for (uint16_t i = 0; i < count; ++i) {
-        memset(list[i].ssid, 0, sizeof(list[i].ssid));
-        strncpy(list[i].ssid, tmp[i].ssid, sizeof(list[i].ssid) - 1);
-        list[i].rssi = tmp[i].rssi;
-    }
-
-    *count_inout = count;
-    free(tmp);
-    return ESP_OK;
-}
-
-/* -------------------- Web 回调：提交新 WiFi 配置 -------------------- */
-/**
- * @brief Web 模块回调：根据输入的 SSID / 密码发起一次连接
- */
-static esp_err_t web_cb_configure(const char *ssid, const char *password)
-{
-    return wifi_module_connect(ssid, password);
-}
-
-/* -------------------- Web 回调：获取当前 WiFi 状态 -------------------- */
-/**
- * @brief Web 模块回调：查询 STA 当前连接状态、IP、BSSID 等
- */
-static esp_err_t web_cb_get_status(web_wifi_status_t *status)
-{
-    if (status == NULL) {
-        return ESP_ERR_INVALID_ARG;
-    }
-
-    memset(status, 0, sizeof(*status));
-
-    /* 仅在 STA 或 APSTA 模式下才认为可能已连接路由器 */
-    wifi_mode_t mode;
-    esp_err_t   ret = esp_wifi_get_mode(&mode);
-    if (ret != ESP_OK) {
-        return ret;
-    }
-
-    if (mode != WIFI_MODE_STA && mode != WIFI_MODE_APSTA) {
-        status->connected = false;
+    /* 如管理状态机认为“未连接”，直接返回默认占位值 */
+    if (s_wifi_manage_state != WIFI_MANAGE_STATE_CONNECTED) {
         return ESP_OK;
     }
 
-    /* 获取当前连接 AP 的信息（若未连接会返回错误） */
-    wifi_ap_record_t ap_info;
-    ret = esp_wifi_sta_get_ap_info(&ap_info);
-    if (ret != ESP_OK) {
-        status->connected = false;
-        return ESP_OK;
+    out->connected = true;
+
+    /* 读取当前连接 AP 的基础信息（SSID + RSSI） */
+    wifi_ap_record_t ap_info = {0};
+    if (esp_wifi_sta_get_ap_info(&ap_info) == ESP_OK) {
+        strncpy(out->ssid, (const char *)ap_info.ssid, sizeof(out->ssid));
+        out->ssid[sizeof(out->ssid) - 1] = '\0';
+        out->rssi = ap_info.rssi;
     }
 
-    status->connected = true;
-    strncpy(status->ssid, (const char *)ap_info.ssid, sizeof(status->ssid) - 1);
-    status->rssi = ap_info.rssi;
-
-    /* 查询 STA 接口 IP 地址 */
-    esp_netif_ip_info_t ip_info = {0};
-    esp_netif_t        *netif   = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
-    if (netif != NULL) {
-        (void)esp_netif_get_ip_info(netif, &ip_info);
-    }
-
-    snprintf(status->ip,
-             sizeof(status->ip),
-             "%d.%d.%d.%d",
-             IP2STR(&ip_info.ip));
-
-    snprintf(status->bssid,
-             sizeof(status->bssid),
-             "%02X:%02X:%02X:%02X:%02X:%02X",
-             ap_info.bssid[0],
-             ap_info.bssid[1],
-             ap_info.bssid[2],
-             ap_info.bssid[3],
-             ap_info.bssid[4],
-             ap_info.bssid[5]);
-
-    return ESP_OK;
-}
-
-/* -------------------- Web 回调：查询已保存 WiFi 列表 -------------------- */
-/**
- * @brief Web 模块回调：获取 NVS 中保存的 WiFi SSID 列表
- *
- * 仅返回 SSID，不含密码。
- */
-static esp_err_t web_cb_get_saved(web_saved_wifi_t *list, uint8_t *count_inout)
-{
-    if (list == NULL || count_inout == NULL || *count_inout == 0) {
-        return ESP_ERR_INVALID_ARG;
-    }
-
-    uint8_t max_out = *count_inout;
-
-    /* 管理配置中指定的最大保存数量，最少为 1 */
-    uint8_t max_internal = (s_wifi_cfg.save_wifi_count <= 0)
-                               ? 1
-                               : (uint8_t)s_wifi_cfg.save_wifi_count;
-
-    wifi_config_t *cfg_list = calloc(max_internal, sizeof(wifi_config_t));
-    if (cfg_list == NULL) {
-        return ESP_ERR_NO_MEM;
-    }
-
-    uint8_t   count = 0;
-    esp_err_t ret   = wifi_storage_load_all(cfg_list, &count);
-    if (ret != ESP_OK) {
-        free(cfg_list);
-        return ret;
-    }
-
-    if (count == 0) {
-        *count_inout = 0;
-        free(cfg_list);
-        return ESP_OK;
-    }
-
-    if (count > max_out) {
-        count = max_out;
-    }
-
-    /* 仅拷贝 SSID 给 Web 层，避免泄露密码 */
-    for (uint8_t i = 0; i < count; ++i) {
-        memset(list[i].ssid, 0, sizeof(list[i].ssid));
-        strncpy(list[i].ssid,
-                (const char *)cfg_list[i].sta.ssid,
-                sizeof(list[i].ssid) - 1);
-    }
-
-    *count_inout = count;
-    free(cfg_list);
-    return ESP_OK;
-}
-
-/* -------------------- Web 回调：按已保存配置连接 -------------------- */
-/**
- * @brief Web 模块回调：根据传入 SSID 查找已保存配置，并发起连接
- */
-static esp_err_t web_cb_connect_saved(const char *ssid)
-{
-    if (ssid == NULL || ssid[0] == '\0') {
-        return ESP_ERR_INVALID_ARG;
-    }
-
-    uint8_t max_internal = (s_wifi_cfg.save_wifi_count <= 0)
-                               ? 1
-                               : (uint8_t)s_wifi_cfg.save_wifi_count;
-
-    wifi_config_t *cfg_list = calloc(max_internal, sizeof(wifi_config_t));
-    if (cfg_list == NULL) {
-        return ESP_ERR_NO_MEM;
-    }
-
-    uint8_t   count = 0;
-    esp_err_t ret   = wifi_storage_load_all(cfg_list, &count);
-    if (ret != ESP_OK) {
-        free(cfg_list);
-        return ret;
-    }
-
-    /* 按 SSID 精确匹配，然后用保存的密码发起连接 */
-    for (uint8_t i = 0; i < count; ++i) {
-        if (strncmp((const char *)cfg_list[i].sta.ssid,
-                    ssid,
-                    sizeof(cfg_list[i].sta.ssid)) == 0) {
-            const char *pwd = (cfg_list[i].sta.password[0] == '\0')
-                                  ? NULL
-                                  : (const char *)cfg_list[i].sta.password;
-            ret = wifi_module_connect(ssid, pwd);
-            free(cfg_list);
-            return ret;
+    /* 读取当前 STA IPv4 地址（根据默认 netif 关键字获取） */
+    esp_netif_t *sta_netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+    if (sta_netif != NULL) {
+        esp_netif_ip_info_t ip_info = {0};
+        if (esp_netif_get_ip_info(sta_netif, &ip_info) == ESP_OK) {
+            /* 使用 IPSTR / IP2STR 宏将 IPv4 地址转换为文本 */
+            snprintf(out->ip,
+                     sizeof(out->ip),
+                     IPSTR,
+                     IP2STR(&ip_info.ip));
         }
     }
 
-    free(cfg_list);
-    return ESP_ERR_NOT_FOUND;
-}
-
-/* -------------------- Web 回调：删除已保存 WiFi -------------------- */
-/**
- * @brief Web 模块回调：按 SSID 删除保存的条目
- */
-static esp_err_t web_cb_delete_saved(const char *ssid)
-{
-    return wifi_storage_delete_by_ssid(ssid);
-}
-
-/* -------------------- Web 回调：重置状态机重试状态 -------------------- */
-/**
- * @brief Web 模块回调：重置自动重连相关变量
- */
-static esp_err_t web_cb_reset_retry(void)
-{
-    s_wifi_try_index    = 0;
-    s_wifi_connecting   = false;
-    s_connect_failed_ts = 0;
-    s_wifi_manage_state = WIFI_MANAGE_STATE_DISCONNECTED;
     return ESP_OK;
 }
 
@@ -486,25 +312,21 @@ esp_err_t wifi_manage_init(const wifi_manage_config_t *config)
     }
 
     /* ---- 初始化 Web 配网模块 ---- */
-    web_module_config_t web_cfg = WEB_MODULE_DEFAULT_CONFIG();
+    {
+        web_module_config_t web_cfg = WEB_MODULE_DEFAULT_CONFIG();
 
-    /* HTTP 端口：合法范围 (0, 65535]，否则使用默认值 */
-    if (s_wifi_cfg.web_port > 0 && s_wifi_cfg.web_port <= 65535) {
-        web_cfg.http_port = (uint16_t)s_wifi_cfg.web_port;
-    }
+        /* 端口由管理配置决定，<=0 时沿用默认值 */
+        if (s_wifi_cfg.web_port > 0) {
+            web_cfg.http_port = s_wifi_cfg.web_port;
+        }
 
-    /* 绑定所有 Web 回调接口 */
-    web_cfg.scan_cb          = web_cb_scan;
-    web_cfg.configure_cb     = web_cb_configure;
-    web_cfg.get_status_cb    = web_cb_get_status;
-    web_cfg.get_saved_cb     = web_cb_get_saved;
-    web_cfg.connect_saved_cb = web_cb_connect_saved;
-    web_cfg.delete_saved_cb  = web_cb_delete_saved;
-    web_cfg.reset_retry_cb   = web_cb_reset_retry;
+        /* 通过回调向 Web 模块暴露当前 WiFi 状态查询能力 */
+        web_cfg.get_status_cb = wifi_manage_get_web_status;
 
-    ret = web_module_start(&web_cfg);
-    if (ret != ESP_OK) {
-        return ret;
+        ret = web_module_init(&web_cfg);
+        if (ret != ESP_OK) {
+            return ret;
+        }
     }
 
     // 创建WiFi管理任务

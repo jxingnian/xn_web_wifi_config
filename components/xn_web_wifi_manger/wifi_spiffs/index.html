@@ -1,603 +1,192 @@
+<!--
+ * @Author: 星年 && jixingnian@gmail.com
+ * @Date: 2025-11-22 21:25:04
+ * @LastEditors: xingnian jixingnian@gmail.com
+ * @LastEditTime: 2025-11-22 21:38:55
+ * @FilePath: \xn_web_wifi_config\components\xn_web_wifi_manger\wifi_spiffs\index.html
+ * @Description: Web 配网页面（仅基础框架：WiFi 状态 / 已保存 / 扫描 / 连接）
+ *
+ * 页面职责：
+ * 1. 提供一个简洁的配网入口页面
+ * 2. 按顺序展示四个基础模块的占位结构
+ * 3. 所有交互逻辑在 app.js 中按需逐步补充
+ *
+ * Copyright (c) 2025 by ${git_name_email}, All Rights Reserved.
+-->
+
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ESP32 WiFi配置</title>
-    <style>
-        /* 全局样式重置，消除默认边距和内边距，设置盒模型为border-box */
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        /* 页面主体样式，居中显示，设置背景色和字体 */
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: #f5f5f5;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>WiFi 管理</title>
 
-        /* 主容器样式，白色背景，圆角和阴影 */
-        .container {
-            width: 90%;
-            max-width: 450px;
-            margin: 0 auto;
-            background: white;
-            padding: 25px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-
-        /* 标题样式 */
-        h1 {
-            text-align: center;
-            color: #333;
-            margin-bottom: 25px;
-            font-size: 1.8rem;
-        }
-
-        /* 表单分组样式 */
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        /* 标签样式 */
-        label {
-            display: block;
-            margin-bottom: 8px;
-            color: #555;
-            font-weight: 500;
-        }
-
-        /* 输入框样式 */
-        input[type="text"],
-        input[type="password"] {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #ddd;
-            border-radius: 8px;
-            font-size: 16px;
-            transition: border-color 0.3s;
-        }
-
-        /* 输入框聚焦样式 */
-        input[type="text"]:focus,
-        input[type="password"]:focus {
-            border-color: #007bff;
-            outline: none;
-        }
-
-        /* WiFi列表容器样式 */
-        .wifi-list {
-            margin-bottom: 20px;
-            max-height: 200px;
-            overflow-y: auto;
-        }
-
-        /* 单个WiFi项样式 */
-        .wifi-item {
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            margin-bottom: 8px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        /* WiFi项悬停效果 */
-        .wifi-item:hover {
-            background-color: #f8f9fa;
-        }
-
-        /* WiFi名称样式 */
-        .wifi-name {
-            flex-grow: 1;
-        }
-
-        /* WiFi信号强度样式 */
-        .wifi-signal {
-            margin-left: 10px;
-            color: #666;
-        }
-
-        /* 按钮通用样式 */
-        button {
-            width: 100%;
-            padding: 12px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 16px;
-            font-weight: 500;
-            transition: background-color 0.3s;
-        }
-
-        /* 按钮悬停效果 */
-        button:hover {
-            background-color: #0056b3;
-        }
-
-        /* 按钮禁用样式 */
-        button:disabled {
-            background-color: #ccc;
-            cursor: not-allowed;
-        }
-
-        /* 状态提示框样式 */
-        #status {
-            margin-top: 20px;
-            padding: 12px;
-            border-radius: 8px;
-            text-align: center;
-            font-weight: 500;
-            opacity: 0;
-            transition: opacity 0.3s;
-        }
-
-        /* 状态提示框显示时的样式 */
-        #status.show {
-            opacity: 1;
-        }
-
-        /* 成功、错误、加载状态的样式 */
-        .success {
-            background-color: #d4edda;
-            color: #155724;
-        }
-
-        .error {
-            background-color: #f8d7da;
-            color: #721c24;
-        }
-
-        .loading {
-            background-color: #e2e3e5;
-            color: #383d41;
-        }
-
-        /* 响应式样式，适配小屏幕 */
-        @media (max-width: 480px) {
-            body {
-                padding: 15px;
-            }
-
-            .container {
-                padding: 20px;
-            }
-
-            h1 {
-                font-size: 1.5rem;
-            }
-
-            input[type="text"],
-            input[type="password"] {
-                font-size: 14px;
-                padding: 10px;
-            }
-        }
-
-        /* 刷新按钮样式 */
-        .refresh-btn {
-            background: none;
-            border: none;
-            color: #007bff;
-            cursor: pointer;
-            padding: 5px;
-            margin-bottom: 10px;
-            display: flex;
-            align-items: center;
-            font-size: 14px;
-        }
-
-        .refresh-btn:hover {
-            color: #0056b3;
-            background: none;
-        }
-
-        .refresh-icon {
-            margin-right: 5px;
-        }
-
-        /* 作者信息样式 */
-        .author {
-            text-align: center;
-            color: #666;
-            margin-bottom: 20px;
-            font-size: 0.9rem;
-        }
-        
-        /* 当前状态区块样式 */
-        .status-section {
-            margin-bottom: 20px;
-            padding: 15px;
-            background-color: #f8f9fa;
-            border-radius: 8px;
-        }
-        
-        /* 已保存WiFi区块样式 */
-        .saved-wifi-section {
-            margin-bottom: 20px;
-        }
-        
-        /* 单个已保存WiFi项样式 */
-        .saved-wifi-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            margin-bottom: 8px;
-        }
-        
-        /* 删除按钮样式 */
-        .delete-btn {
-            background-color: #dc3545;
-            padding: 5px 10px;
-            font-size: 14px;
-            margin-left: 10px;
-        }
-        
-        .delete-btn:hover {
-            background-color: #c82333;
-        }
-        
-        /* 连接按钮样式 */
-        .connect-btn {
-            background-color: #28a745;
-            padding: 5px 10px;
-            font-size: 14px;
-        }
-        
-        .connect-btn:hover {
-            background-color: #218838;
-        }
-        
-        /* 按钮组样式 */
-        .btn-group {
-            display: flex;
-            gap: 10px;
-        }
-    </style>
+  <!-- 页面样式：仅负责基础布局与配色，交互逻辑在 app.js 中实现 -->
+  <link rel="stylesheet" href="app.css" />
 </head>
 <body>
-    <div class="container">
-        <h1>ESP32 WiFi配置</h1>
-        <div class="author">By.星年</div>
-        
-        <!-- 当前WiFi连接状态显示区 -->
-        <div class="status-section">
-            <h2>当前连接状态</h2>
-            <div id="wifi-status">正在获取状态...</div>
+  <!-- 根容器：限制页面宽度并居中显示所有模块 -->
+  <div class="page">
+    <div class="page-inner">
+
+      <!-- 顶部标题区域：展示页面说明与整体状态摘要 -->
+      <header class="page-header">
+        <div>
+          <div class="page-title">WiFi 管理</div>
+          <div class="page-subtitle">仅包含基础框架，功能将根据实际需求逐步完善</div>
         </div>
-        
-        <!-- 已保存的WiFi列表显示区 -->
-        <div class="saved-wifi-section">
-            <h2>已保存的WiFi</h2>
-            <div id="saved-wifi-list">正在加载...</div>
+        <div class="badge">
+          <span class="badge-dot" id="wifi-badge-dot"></span>
+          <span id="wifi-badge-text">未连接</span>
         </div>
-        
-        <!-- 扫描WiFi按钮 -->
-        <button class="refresh-btn" onclick="scanWiFi()">
-            <span class="refresh-icon">🔄</span> 扫描WiFi
-        </button>
-        <!-- WiFi扫描结果列表，内容由JS动态生成 -->
-        <div class="wifi-list" id="wifi-list">
-            <!-- WiFi列表将通过JavaScript动态添加 -->
-        </div>
-        <!-- WiFi连接表单 -->
-        <form id="wifi-form">
-            <div class="form-group">
-                <label for="ssid">WiFi名称 (SSID):</label>
-                <input type="text" id="ssid" name="ssid" required>
+      </header>
+
+      <!-- 主体区域：按顺序排列四个独立模块 -->
+      <main class="page-main">
+
+        <!-- 模块一：当前 WiFi 状态（展示占位信息，不做复杂逻辑） -->
+        <section class="card" id="section-status">
+          <div class="card-header">
+            <div class="card-title">当前 WiFi 状态</div>
+            <!-- 运行模式占位，默认认为设备处于 AP+STA 模式 -->
+            <div class="card-extra" id="wifi-status-mode">AP+STA</div>
+          </div>
+          <div class="card-body">
+            <div class="status-grid">
+              <!-- 左侧为文字信息区域 -->
+              <div>
+                <div class="status-line">
+                  <div class="status-label">连接状态</div>
+                  <div class="status-value" id="wifi-status-text">未连接</div>
+                </div>
+                <div class="status-line">
+                  <div class="status-label">SSID</div>
+                  <div class="status-value" id="wifi-status-ssid">-</div>
+                </div>
+                <div class="status-line">
+                  <div class="status-label">IP 地址</div>
+                  <div class="status-value" id="wifi-status-ip">-</div>
+                </div>
+              </div>
+
+              <!-- 右侧为信号强度可视化（纯装饰，可后续绑定 RSSI） -->
+              <div class="status-visual">
+                <div class="signal-bar" data-level="0" aria-hidden="true">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
+              </div>
             </div>
-            <div class="form-group">
-                <label for="password">WiFi密码:</label>
-                <input type="password" id="password" name="password">
+          </div>
+        </section>
+
+        <!-- 模块二：已保存的 WiFi（仅表格结构，后续由接口填充） -->
+        <section class="card" id="section-saved">
+          <div class="card-header">
+            <div class="card-title">已保存的 WiFi</div>
+            <div class="card-extra">列表由设备返回，顺序也由设备决定</div>
+          </div>
+          <div class="card-body">
+            <div class="table-wrapper">
+              <table class="simple-table">
+                <thead>
+                  <tr>
+                    <th style="width: 40px">#</th>
+                    <th>SSID</th>
+                    <th>备注</th>
+                  </tr>
+                </thead>
+                <!--
+                  行数据由 app.js 根据设备返回结果渲染，
+                  这里仅保留一个干净的占位容器。
+                -->
+                <tbody id="saved-list"></tbody>
+              </table>
+              <p class="empty-hint" id="saved-empty">暂无已保存的 WiFi</p>
             </div>
-            <button type="submit" id="submit-btn">连接</button>
-        </form>
-        <!-- 状态提示信息 -->
-        <div id="status"></div>
+          </div>
+        </section>
+
+        <!-- 模块三：扫描附近 WiFi（按钮 + 结果表格骨架） -->
+        <section class="card" id="section-scan">
+          <div class="card-header">
+            <div class="card-title">扫描附近 WiFi</div>
+            <div class="card-extra">点击按钮后由设备执行实际扫描</div>
+          </div>
+          <div class="card-body">
+            <!-- 操作区：目前只有一个“开始扫描”按钮 -->
+            <div class="toolbar-row">
+              <button class="btn btn-primary" id="btn-scan" type="button">
+                开始扫描
+              </button>
+            </div>
+
+            <div class="table-wrapper">
+              <table class="simple-table">
+                <thead>
+                  <tr>
+                    <th>SSID</th>
+                    <th style="width: 90px">信号</th>
+                    <th style="width: 90px">安全</th>
+                  </tr>
+                </thead>
+                <!-- 扫描结果占位容器，后续由 JS 动态填充 -->
+                <tbody id="scan-list"></tbody>
+              </table>
+              <p class="empty-hint" id="scan-empty">尚未扫描</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- 模块四：连接 WiFi（最小表单，仅包含 SSID 与密码） -->
+        <section class="card" id="section-connect">
+          <div class="card-header">
+            <div class="card-title">连接 WiFi</div>
+            <div class="card-extra">表单提交逻辑后续按需补充</div>
+          </div>
+          <div class="card-body">
+            <form id="connect-form" autocomplete="off">
+              <div class="form-grid">
+                <div class="form-row">
+                  <label class="form-label" for="connect-ssid">SSID</label>
+                  <input
+                    class="form-input"
+                    id="connect-ssid"
+                    name="ssid"
+                    required
+                  />
+                </div>
+                <div class="form-row">
+                  <label class="form-label" for="connect-password">密码</label>
+                  <input
+                    class="form-input"
+                    id="connect-password"
+                    name="password"
+                    type="password"
+                  />
+                </div>
+              </div>
+
+              <!-- 按钮与提示区域：当前仅给出占位提示，不做实际连接 -->
+              <div class="form-actions">
+                <button class="btn btn-primary" type="submit">
+                  连接
+                </button>
+                <div class="form-message" id="connect-message">
+                  <!-- 提示文字由 app.js 设置，例如“尚未接入连接逻辑”等 -->
+                </div>
+              </div>
+            </form>
+          </div>
+        </section>
+
+      </main>
     </div>
+  </div>
 
-    <script>
-        // 标记当前是否正在配置WiFi，防止重复提交
-        let isConfiguring = false;
-
-        /**
-         * 显示状态提示信息
-         * @param {string} message - 要显示的消息内容
-         * @param {string} type - 状态类型（success, error, loading）
-         */
-        function showStatus(message, type) {
-            const statusDiv = document.getElementById('status');
-            statusDiv.textContent = message;
-            statusDiv.className = type + ' show';
-        }
-
-        /**
-         * 根据RSSI信号强度返回对应的信号图标
-         * @param {number} rssi - 信号强度（dBm）
-         * @returns {string} - 信号图标
-         */
-        function getSignalStrengthIcon(rssi) {
-            // 使用三个点表示不同信号强度（强：•••，中：••，弱：•）
-            if (rssi >= -60) return '•••';
-            if (rssi >= -70) return '••';
-            return '•';
-        }
-
-        /**
-         * 扫描WiFi网络并显示在列表中
-         */
-        async function scanWiFi() {
-            try {
-                const wifiList = document.getElementById('wifi-list');
-                // 显示扫描中提示
-                wifiList.innerHTML = '<div style="text-align: center;">扫描中...</div>';
-                
-                // 向后端请求WiFi扫描结果
-                const response = await fetch('/scan');
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const data = await response.json();
-                console.log('Received data:', data);  // 调试日志
-                
-                // 如果后端返回错误
-                if (data.status === 'error') {
-                    showStatus(data.message || '扫描失败', 'error');
-                    return;
-                }
-                
-                // 清空WiFi列表
-                wifiList.innerHTML = '';
-                // 如果没有扫描到WiFi
-                if (!data.networks || data.networks.length === 0) {
-                    wifiList.innerHTML = '<div style="text-align: center;">未找到WiFi网络</div>';
-                    return;
-                }
-
-                // 遍历并显示WiFi列表，按信号强度排序
-                data.networks
-                    .filter(network => network.ssid) // 过滤掉空SSID
-                    .sort((a, b) => b.rssi - a.rssi)
-                    .forEach(network => {
-                        const div = document.createElement('div');
-                        div.className = 'wifi-item';
-                        div.innerHTML = `
-                            <span class="wifi-name">${network.ssid}</span>
-                            <span class="wifi-signal">${getSignalStrengthIcon(network.rssi)} (${network.rssi}dBm)</span>
-                        `;
-                        // 点击WiFi项自动填充SSID到表单
-                        div.onclick = () => {
-                            document.getElementById('ssid').value = network.ssid;
-                            document.getElementById('password').focus();
-                        };
-                        wifiList.appendChild(div);
-                    });
-            } catch (error) {
-                // 扫描出错时的处理
-                console.error('扫描错误:', error);
-                showStatus(`扫描WiFi失败: ${error.message}`, 'error');
-                const wifiList = document.getElementById('wifi-list');
-                if (wifiList) {
-                    wifiList.innerHTML = '<div style="text-align: center; color: red;">扫描失败</div>';
-                }
-            }
-        }
-
-        /**
-         * 监听WiFi连接表单提交事件，提交配置到后端
-         */
-        document.getElementById('wifi-form').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            if (isConfiguring) return;
-
-            const submitBtn = document.getElementById('submit-btn');
-            const formData = new FormData(this);
-            // 获取表单数据
-            const data = {
-                ssid: formData.get('ssid'),
-                password: formData.get('password')
-            };
-
-            try {
-                isConfiguring = true;
-                submitBtn.disabled = true;
-                showStatus('正在配置WiFi...', 'loading');
-                
-                // 发送配置请求到后端
-                const response = await fetch('/configure', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(data)
-                });
-
-                if (response.ok) {
-                    showStatus('WiFi配置成功！设备正在连接到网络...', 'success');
-                    
-                    // 等待设备连接到新网络后再提示，并刷新状态和已保存WiFi列表
-                    setTimeout(() => {
-                        showStatus('配置完成！设备已连接到新网络', 'success');
-                        getWiFiStatus();
-                        getSavedWiFi();
-                    }, 5000);
-                } else {
-                    throw new Error('配置失败');
-                }
-            } catch (error) {
-                showStatus('配置失败：' + error.message, 'error');
-            } finally {
-                isConfiguring = false;
-                submitBtn.disabled = false;
-            }
-        });
-
-        /**
-         * 获取当前WiFi连接状态并显示
-         */
-        async function getWiFiStatus() {
-            try {
-                // 请求当前WiFi状态
-                const response = await fetch('/api/status');
-                const data = await response.json();
-                const statusDiv = document.getElementById('wifi-status');
-                
-                if (data.status === 'connected') {
-                    // 已连接时显示详细信息
-                    statusDiv.innerHTML = `
-                        <p><strong>状态:</strong> 已连接</p>
-                        <p><strong>SSID:</strong> ${data.ssid}</p>
-                        <p><strong>IP地址:</strong> ${data.ip}</p>
-                        <p><strong>信号强度:</strong> ${data.rssi} dBm ${getSignalStrengthIcon(data.rssi)}</p>
-                        <p><strong>BSSID:</strong> ${data.bssid}</p>
-                    `;
-                } else {
-                    // 未连接时提示
-                    statusDiv.innerHTML = '<p><strong>状态:</strong> 未连接</p>';
-                }
-            } catch (error) {
-                // 获取状态失败时的处理
-                console.error('获取WiFi状态失败:', error);
-                document.getElementById('wifi-status').innerHTML = '获取状态失败';
-            }
-        }
-
-        /**
-         * 获取已保存的WiFi列表并显示
-         */
-        async function getSavedWiFi() {
-            try {
-                // 请求已保存WiFi列表
-                const response = await fetch('/api/saved');
-                const data = await response.json();
-                const listDiv = document.getElementById('saved-wifi-list');
-                
-                if (data.length === 0) {
-                    listDiv.innerHTML = '<p>没有已保存的WiFi</p>';
-                    return;
-                }
-                
-                // 生成已保存WiFi列表HTML
-                listDiv.innerHTML = data.map(wifi => `
-                    <div class="saved-wifi-item">
-                        <span>${wifi.ssid}</span>
-                        <div class="btn-group">
-                            <button class="connect-btn" onclick="connectToWiFi('${wifi.ssid}')">连接</button>
-                            <button class="delete-btn" onclick="deleteWiFi('${wifi.ssid}')">删除</button>
-                        </div>
-                    </div>
-                `).join('');
-            } catch (error) {
-                // 获取失败时的处理
-                console.error('获取已保存WiFi失败:', error);
-                document.getElementById('saved-wifi-list').innerHTML = '获取已保存WiFi失败';
-            }
-        }
-
-        /**
-         * 连接到已保存的WiFi
-         * @param {string} ssid - 要连接的WiFi名称
-         */
-        async function connectToWiFi(ssid) {
-            if (isConfiguring) return;
-            isConfiguring = true;
-            
-            showStatus('正在连接到 ' + ssid + '...', 'loading');
-            
-            try {
-                // 首先重置重试计数（后端实现相关）
-                await fetch('/api/reset_retry', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    }
-                });
-                
-                // 发送连接请求
-                const response = await fetch('/api/connect', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ ssid: ssid })
-                });
-                
-                // 等待一段时间后检查连接状态
-                setTimeout(async () => {
-                    const statusResponse = await fetch('/api/status');
-                    const statusData = await statusResponse.json();
-                    
-                    if (statusData.status === 'connected') {
-                        showStatus('连接成功！', 'success');
-                    } else {
-                        showStatus('连接失败，请检查WiFi是否可用', 'error');
-                    }
-                    
-                    getWiFiStatus(); // 更新状态显示
-                    getSavedWiFi();  // 刷新已保存WiFi列表（顺序可能因最近连接而变化）
-                }, 3000);
-            } catch (error) {
-                showStatus('连接失败: ' + error.message, 'error');
-            }
-            
-            isConfiguring = false;
-        }
-
-        /**
-         * 删除已保存的WiFi
-         * @param {string} ssid - 要删除的WiFi名称
-         */
-        async function deleteWiFi(ssid) {
-            // 弹窗确认
-            if (!confirm(`确定要删除 ${ssid} 吗？`)) return;
-            
-            try {
-                // 发送删除请求
-                const response = await fetch('/api/delete', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ ssid: ssid })
-                });
-                
-                if (response.ok) {
-                    showStatus('删除成功', 'success');
-                    getSavedWiFi();   // 刷新已保存WiFi列表
-                    getWiFiStatus();  // 刷新当前状态
-                } else {
-                    showStatus('删除失败', 'error');
-                }
-            } catch (error) {
-                showStatus('删除失败: ' + error.message, 'error');
-            }
-        }
-
-        // 页面加载完成后执行初始化操作
-        document.addEventListener('DOMContentLoaded', function() {
-            getWiFiStatus();    // 获取当前WiFi状态
-            getSavedWiFi();     // 获取已保存WiFi列表
-            setInterval(getWiFiStatus, 5000); // 每5秒自动刷新WiFi状态
-        });
-
-        // 页面完全加载后自动扫描WiFi
-        window.addEventListener('load', scanWiFi);
-    </script>
+  <!-- 页面脚本：只做最小初始化，具体行为由后续需求驱动 -->
+  <script src="app.js"></script>
 </body>
 </html>
