@@ -2,7 +2,7 @@
  * @Author: 星年 && jixingnian@gmail.com
  * @Date: 2025-11-22 16:24:42
  * @LastEditors: xingnian jixingnian@gmail.com
- * @LastEditTime: 2025-11-23 16:40:27
+ * @LastEditTime: 2025-11-23 17:59:02
  * @FilePath: \xn_web_wifi_config\components\xn_web_wifi_manger\src\xn_wifi_manage.c
  * @Description: WiFi 管理模块实现（封装 WiFi / 存储 / Web 配网，提供自动重连与状态管理）
  */
@@ -34,11 +34,20 @@ static wifi_manage_config_t s_wifi_cfg;
 /* WiFi 管理任务句柄 */
 static TaskHandle_t         s_wifi_manage_task  = NULL;
 
+/* 统一更新状态并通知上层回调（若配置了 wifi_event_cb） */
+static void wifi_manage_notify_state(wifi_manage_state_t new_state)
+{
+    s_wifi_manage_state = new_state;
+
+    if (s_wifi_cfg.wifi_event_cb) {
+        s_wifi_cfg.wifi_event_cb(new_state);
+    }
+}
+
 /* 遍历已保存 WiFi 时的状态 */
-static bool       s_wifi_connecting    = false; /* 当前是否有一次 STA 连接正在进行 */
-static uint8_t    s_wifi_try_index     = 0;     /* 本轮遍历中，正在尝试的 WiFi 下标 */
-static TickType_t s_connect_failed_ts  = 0;     /* 最近一次全轮尝试失败的时间戳 */
-static int        s_retry_round_count  = 0;     /* 已完成的整轮重试次数（遍历全部已保存 WiFi 仍失败记为一轮） */
+static bool       s_wifi_connecting   = false;  /* 当前是否有一次 STA 连接正在进行 */
+static uint8_t    s_wifi_try_index    = 0;      /* 本轮遍历中，正在尝试的 WiFi 下标 */
+static TickType_t s_connect_failed_ts = 0;      /* 最近一次全轮尝试失败的时间戳 */
 
 /* -------------------- Web 回调：查询当前 WiFi 状态 -------------------- */
 /**
@@ -363,11 +372,10 @@ static void wifi_manage_on_wifi_event(wifi_module_event_t event)
 
     case WIFI_MODULE_EVENT_STA_GOT_IP: {
         /* 获取到 IP，认为一次连接流程成功结束 */
-        s_wifi_manage_state = WIFI_MANAGE_STATE_CONNECTED;
+        wifi_manage_notify_state(WIFI_MANAGE_STATE_CONNECTED);
         s_wifi_connecting   = false;
         s_wifi_try_index    = 0;      /* 下次自动重连从首选 WiFi 开始 */
         s_connect_failed_ts = 0;
-        s_retry_round_count = 0;
 
         /* 将当前配置上报给存储模块，用于调整优先级等策略 */
         wifi_config_t current_cfg = {0};
@@ -379,7 +387,7 @@ static void wifi_manage_on_wifi_event(wifi_module_event_t event)
 
     case WIFI_MODULE_EVENT_STA_DISCONNECTED:
         /* 连接断开，等待管理任务按策略进行重连 */
-        s_wifi_manage_state = WIFI_MANAGE_STATE_DISCONNECTED;
+        wifi_manage_notify_state(WIFI_MANAGE_STATE_DISCONNECTED);
         s_wifi_connecting   = false;
         s_wifi_try_index    = 0;
         break;
@@ -408,10 +416,6 @@ static void wifi_manage_step(void)
     case WIFI_MANAGE_STATE_DISCONNECTED: {
         /* 断开状态：按顺序遍历已保存 WiFi，逐个尝试连接 */
 
-        if (s_wifi_cfg.max_retry_count == 0) {
-            break;
-        }
-
         if (s_wifi_connecting) {
             /* 已经有一个连接操作在进行，等待事件回调给结果 */
             break;
@@ -439,8 +443,7 @@ static void wifi_manage_step(void)
 
         if (s_wifi_try_index >= count) {
             /* 本轮所有配置均尝试过，仍未连接成功，进入“整轮失败”状态 */
-            s_retry_round_count++;
-            s_wifi_manage_state = WIFI_MANAGE_STATE_CONNECT_FAILED;
+            wifi_manage_notify_state(WIFI_MANAGE_STATE_CONNECT_FAILED);
             s_connect_failed_ts = xTaskGetTickCount();
             s_wifi_try_index    = 0;
             s_wifi_connecting   = false;
@@ -479,15 +482,6 @@ static void wifi_manage_step(void)
     case WIFI_MANAGE_STATE_CONNECT_FAILED: {
         /* 一轮全部失败，根据配置的重连间隔决定何时重新遍历 */
 
-        if (s_wifi_cfg.max_retry_count == 0) {
-            break;
-        }
-
-        if (s_wifi_cfg.max_retry_count > 0 &&
-            s_retry_round_count >= s_wifi_cfg.max_retry_count) {
-            break;
-        }
-
         if (s_wifi_cfg.reconnect_interval_ms < 0) {
             /* 小于 0 表示关闭自动重连，保持在失败状态 */
             break;
@@ -503,7 +497,7 @@ static void wifi_manage_step(void)
             /* 到达重试时间，从头开始新一轮遍历 */
             s_wifi_try_index    = 0;
             s_wifi_connecting   = false;
-            s_wifi_manage_state = WIFI_MANAGE_STATE_DISCONNECTED;
+            wifi_manage_notify_state(WIFI_MANAGE_STATE_DISCONNECTED);
         }
         break;
     }
@@ -547,8 +541,6 @@ esp_err_t wifi_manage_init(const wifi_manage_config_t *config)
     } else {
         s_wifi_cfg = *config;
     }
-
-    s_retry_round_count = 0;
 
     /* ---- 初始化 WiFi 模块 ---- */
     wifi_module_config_t wifi_cfg = WIFI_MODULE_DEFAULT_CONFIG();
