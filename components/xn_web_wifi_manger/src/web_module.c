@@ -308,19 +308,31 @@ static esp_err_t web_module_scan_get_handler(httpd_req_t *req)
     if (cnt == 0) {
         static const char *EMPTY_JSON = "{\"items\":[]}";
         httpd_resp_send(req, EMPTY_JSON, strlen(EMPTY_JSON));
+        free(list);
         return ESP_OK;
     }
 
-    /* 序列化为形如 {"items":[{"index":0,"ssid":"xxx","rssi":-60}, ...]} 的 JSON */
-    char  json[768];
+    /* 序列化为形如 {"items":[{"index":0,"ssid":"xxx","rssi":-60}, ...]} 的 JSON
+     * 最多 32 条结果，每条包括 SSID 与 RSSI。为避免占用过多栈空间，
+     * 这里改为在堆上分配缓冲区。 */
+    const size_t json_buf_size = 3072; /* 足够容纳 32 条典型记录 */
+    char        *json          = (char *)malloc(json_buf_size);
+    if (json == NULL) {
+        httpd_resp_send_err(req,
+                            HTTPD_500_INTERNAL_SERVER_ERROR,
+                            "no memory");
+        free(list);
+        return ESP_OK;
+    }
+
     size_t offset = 0;
 
-    offset += (size_t)snprintf(json + offset, sizeof(json) - offset, "{\"items\":[");
+    offset += (size_t)snprintf(json + offset, json_buf_size - offset, "{\"items\":[");
 
-    for (size_t i = 0; i < cnt && offset < sizeof(json); i++) {
+    for (size_t i = 0; i < cnt && offset < json_buf_size; i++) {
         const char *comma = (i == 0) ? "" : ",";
         offset += (size_t)snprintf(json + offset,
-                                   sizeof(json) - offset,
+                                   json_buf_size - offset,
                                    "%s{\"index\":%u,\"ssid\":\"%s\",\"rssi\":%d}",
                                    comma,
                                    (unsigned)i,
@@ -328,17 +340,19 @@ static esp_err_t web_module_scan_get_handler(httpd_req_t *req)
                                    (int)list[i].rssi);
     }
 
-    if (offset >= sizeof(json)) {
+    if (offset >= json_buf_size) {
         /* 理论上不会超出，若超出则截断为一个空列表作为兜底 */
         const char *FALLBACK = "{\"items\":[]}";
         httpd_resp_send(req, FALLBACK, strlen(FALLBACK));
         free(list);
+        free(json);
         return ESP_OK;
     }
 
-    offset += (size_t)snprintf(json + offset, sizeof(json) - offset, "]}");
+    offset += (size_t)snprintf(json + offset, json_buf_size - offset, "]}");
 
     httpd_resp_send(req, json, (int)offset);
+    free(json);
     free(list);
     return ESP_OK;
 }

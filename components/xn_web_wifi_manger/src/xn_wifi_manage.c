@@ -1,8 +1,8 @@
 /*
  * @Author: 星年 && jixingnian@gmail.com
  * @Date: 2025-11-22 16:24:42
- * @LastEditors: xingnian j_xingnian@163.com
- * @LastEditTime: 2025-11-23 10:56:50
+ * @LastEditors: xingnian jixingnian@gmail.com
+ * @LastEditTime: 2025-11-23 11:29:30
  * @FilePath: \xn_web_wifi_config\components\xn_web_wifi_manger\src\xn_wifi_manage.c
  * @Description: WiFi 管理模块实现（封装 WiFi / 存储 / Web 配网，提供自动重连与状态管理）
  */
@@ -17,6 +17,7 @@
 
 #include "esp_wifi.h"
 #include "esp_netif.h"
+#include "esp_log.h"
 
 #include "wifi_module.h"
 #include "storage_module.h"
@@ -227,6 +228,8 @@ static esp_err_t wifi_manage_scan_web(web_scan_result_t *list, size_t *inout_cnt
         return ESP_ERR_INVALID_ARG;
     }
 
+    ESP_LOGI(TAG, "web scan request: max_cnt=%u", (unsigned)(*inout_cnt));
+
     uint16_t cap = (uint16_t)(*inout_cnt);
     wifi_module_scan_result_t *results =
         (wifi_module_scan_result_t *)malloc(cap * sizeof(wifi_module_scan_result_t));
@@ -242,6 +245,8 @@ static esp_err_t wifi_manage_scan_web(web_scan_result_t *list, size_t *inout_cnt
         *inout_cnt = 0;
         return ret;
     }
+
+    ESP_LOGI(TAG, "wifi scan done: count=%u", (unsigned)count);
 
     size_t out_cnt = (size_t)count;
     if (out_cnt > *inout_cnt) {

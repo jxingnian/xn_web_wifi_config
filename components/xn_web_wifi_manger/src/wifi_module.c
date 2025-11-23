@@ -442,6 +442,8 @@ esp_err_t wifi_module_scan(wifi_module_scan_result_t *results, uint16_t *count_i
 
     wifi_scan_config_t scan_cfg = {0};
 
+    ESP_LOGI(TAG, "start wifi scan, max_out=%u", (unsigned)(*count_inout));
+
     /* 阻塞式扫描，直到完成 */
     esp_err_t ret = esp_wifi_scan_start(&scan_cfg, true);
     if (ret != ESP_OK) {
@@ -457,6 +459,7 @@ esp_err_t wifi_module_scan(wifi_module_scan_result_t *results, uint16_t *count_i
     }
 
     if (ap_num == 0) {
+        ESP_LOGI(TAG, "wifi scan done: found 0 AP");
         *count_inout = 0;
         return ESP_OK;
     }
@@ -491,6 +494,7 @@ esp_err_t wifi_module_scan(wifi_module_scan_result_t *results, uint16_t *count_i
     }
 
     *count_inout = ap_num;
+    ESP_LOGI(TAG, "wifi scan done: found %u AP(s), out=%u", (unsigned)ap_num, (unsigned)(*count_inout));
     free(ap_list);
     return ESP_OK;
 }
